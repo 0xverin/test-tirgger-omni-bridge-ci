@@ -1,6 +1,6 @@
 services: 
   tee-bridge:
-    image: tee-bridge:latest
+    image: bridge:latest
     environment: 
       - RUST_LOG=debug
     depends_on:

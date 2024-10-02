@@ -3,12 +3,12 @@
 
 ARCH_LIBDIR ?= /lib/$(shell $(CC) -dumpmachine)
 
-SELF_EXE = target/release/tee-bridge
+SELF_EXE = target/release/bridge-worker
 
 .PHONY: all
-all: $(SELF_EXE) tee-bridge.manifest
+all: $(SELF_EXE) bridge.manifest
 ifeq ($(SGX),1)
-all: tee-bridge.manifest.sgx tee-bridge.sig
+all: bridge.manifest.sgx bridge.sig
 endif
 
 ifeq ($(DEBUG),1)
@@ -25,7 +25,7 @@ endif
 $(SELF_EXE): Cargo.toml
 	cargo build --release
 
-tee-bridge.manifest: tee-bridge.manifest.template
+bridge.manifest: bridge.manifest.template
 	gramine-manifest \
 		-Dlog_level=$(GRAMINE_LOG_LEVEL) \
 		-Darch_libdir=$(ARCH_LIBDIR) \
@@ -34,11 +34,11 @@ tee-bridge.manifest: tee-bridge.manifest.template
 
 # Make on Ubuntu <= 20.04 doesn't support "Rules with Grouped Targets" (`&:`),
 # see the helloworld example for details on this workaround.
-tee-bridge.manifest.sgx tee-bridge.sig: sgx_sign
+bridge.manifest.sgx bridge.sig: sgx_sign
 	@:
 
 .INTERMEDIATE: sgx_sign
-sgx_sign: tee-bridge.manifest $(SELF_EXE)
+sgx_sign: bridge.manifest $(SELF_EXE)
 	gramine-sgx-sign \
 		--manifest $< \
 		--output $<.sgx
@@ -51,7 +51,7 @@ endif
 
 .PHONY: start-gramine-server
 start-gramine-server: all
-	$(GRAMINE) tee-bridge
+	$(GRAMINE) bridge
 
 .PHONY: clean
 clean:
@@ -63,7 +63,7 @@ distclean: clean
 
 .PHONY: build-docker
 build-docker:
-	docker build . --tag tee-bridge:latest
+	docker build . --tag bridge:latest
 
 .PHONY: start-local
 start-local:
