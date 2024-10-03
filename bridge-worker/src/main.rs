@@ -28,6 +28,8 @@ use tokio::{runtime::Handle, sync::oneshot};
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
+    let mut handles = vec![];
+
     env_logger::builder()
         .format(|buf, record| {
             let ts = buf.timestamp_micros();
@@ -47,11 +49,13 @@ async fn main() -> Result<(), ()> {
         ()
     })?;
 
-    let sepolia_sync_handle = sync_sepolia().unwrap();
-    let litentry_rococo_sync_handle = sync_litentry_rococo().await.unwrap();
+    handles.push(sync_sepolia().unwrap());
+    handles.push(sync_litentry_rococo().await.unwrap());
 
-    sepolia_sync_handle.join();
-    litentry_rococo_sync_handle.join();
+    for handle in handles {
+        handle.join().unwrap()
+    }
+
     Ok(())
 }
 
