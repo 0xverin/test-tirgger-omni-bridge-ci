@@ -17,10 +17,10 @@
 use ethereum_listener::create_listener;
 use ethereum_relayer::key_store::EthereumKeyStore;
 use ethereum_relayer::EthereumRelayer;
-use log::info;
-use std::io::Write;
+use log::{error, info};
 use std::thread;
 use std::thread::JoinHandle;
+use std::{fs, io::Write};
 use substrate_listener::CustomConfig;
 use substrate_relayer::key_store::SubstrateKeyStore;
 use substrate_relayer::SubstrateRelayer;
@@ -42,6 +42,11 @@ async fn main() -> Result<(), ()> {
         })
         .init();
 
+    fs::create_dir_all("data/").map_err(|e| {
+        error!("Could not create data dir");
+        ()
+    })?;
+
     let sepolia_sync_handle = sync_sepolia().unwrap();
     let litentry_rococo_sync_handle = sync_litentry_rococo().await.unwrap();
 
@@ -53,7 +58,7 @@ async fn main() -> Result<(), ()> {
 async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
     let (sub_stop_sender, sub_stop_receiver) = oneshot::channel();
 
-    let key_store = EthereumKeyStore::new("ethereum_relayer_key.bin".to_string());
+    let key_store = EthereumKeyStore::new("data/ethereum_relayer_key.bin".to_string());
 
     let relayer = EthereumRelayer::new(
         "http://ethereum-node:8545",
@@ -88,7 +93,7 @@ async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
 fn sync_sepolia() -> Result<JoinHandle<()>, ()> {
     let finalization_gap_blocks = 6;
 
-    let key_store = SubstrateKeyStore::new("substrate_relayer_key.bin".to_string());
+    let key_store = SubstrateKeyStore::new("data/substrate_relayer_key.bin".to_string());
 
     let relayer: SubstrateRelayer<CustomConfig> =
         SubstrateRelayer::new("ws://litentry-node:9944", key_store);

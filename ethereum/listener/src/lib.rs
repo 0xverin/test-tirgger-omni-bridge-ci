@@ -46,7 +46,7 @@ pub fn create_listener(
     let client = EthersRpcClient::new(http_rpc_endpoint).map_err(|e| {
         error!("Could not connect to rpc: {:?}", e);
     })?;
-    let last_processed_log_repository = FileCheckpointRepository::new("ethereum_last_log.bin");
+    let last_processed_log_repository = FileCheckpointRepository::new("data/ethereum_last_log.bin");
 
     let mut relay_map = HashMap::new();
 

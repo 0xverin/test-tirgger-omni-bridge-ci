@@ -18,6 +18,7 @@ loader.env.RUST_BACKTRACE = "full"
 fs.mounts = [
   { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
   { path = "{{ arch_libdir }}", uri = "file:{{ arch_libdir }}" },
+  { path = "/data", uri = "file:data", type="encrypted", key_name="_sgx_mrsigner" },
 ]
 
 sgx.debug = true
@@ -41,4 +42,4 @@ sgx.trusted_files = [
 # - any threads and threadpools you might be starting
 # - helper threads internal to Gramine — see:
 #   https://gramine.readthedocs.io/en/stable/manifest-syntax.html#number-of-threads
-sgx.max_threads = {{ '1' if env.get('EDMM', '0') == '1' else '8' }}
+sgx.max_threads = {{ '1' if env.get('EDMM', '0') == '1' else '64' }}
