@@ -18,6 +18,7 @@ use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
 use bridge_core::key_store::KeyStore;
 use bridge_core::relay::Relayer;
+use bridge_core::listener::DepositRecord;
 use log::error;
 use std::marker::PhantomData;
 use subxt::utils::AccountId32;
@@ -51,11 +52,13 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, data: Vec<u8>) -> Result<(), ()> {
-        //todo: amount and account from data
+    async fn relay(&self, data: Vec<DepositRecord>) -> Result<(), ()> {
+        // We only take the first data 
+        let deposit_record = data[0];
+        
         let call = litentry_rococo::tx()
-            .pallet_bridge()
-            .pay_out(10, AccountId32::from([0; 32]));
+            .bridge_transfer
+            .transfer(deposit_record.destination_recipient_address, deposit_record.amount, deposit_record.resource_id);
 
         let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
             .await

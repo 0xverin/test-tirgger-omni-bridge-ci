@@ -77,7 +77,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
+    ) -> Result<Vec<PayInEventType>, ()> {
         match self
             .legacy
             .chain_get_block_hash(Some(block_num.into()))
@@ -93,12 +93,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
 
                 let pay_in_events = events.find::<PayInEventType>();
 
-                Ok(pay_in_events
-                    .enumerate()
-                    .map(|(i, event)| {
-                        BlockEvent::new(EventId::new(block_num, i as u64), PayInEvent {})
-                    })
-                    .collect())
+                Ok(pay_in_events)
             }
             None => Err(()),
         }

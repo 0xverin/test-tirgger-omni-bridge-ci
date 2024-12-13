@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity 0.8.11;
+pragma solidity 0.6.12;
 
 import "../interfaces/IERCHandler.sol";
 
@@ -9,7 +9,7 @@ import "../interfaces/IERCHandler.sol";
     @notice This contract is intended to be used with the Bridge contract.
  */
 contract HandlerHelpers is IERCHandler {
-    address public immutable _bridgeAddress;
+    address public _bridgeAddress;
 
     // resourceID => token contract address
     mapping (bytes32 => address) public _resourceIDToTokenContractAddress;
@@ -26,15 +26,6 @@ contract HandlerHelpers is IERCHandler {
     modifier onlyBridge() {
         _onlyBridge();
         _;
-    }
-    
-    /**
-        @param bridgeAddress Contract address of previously deployed Bridge.
-     */
-    constructor(
-        address          bridgeAddress
-    ) public {
-        _bridgeAddress = bridgeAddress;
     }
 
     function _onlyBridge() private view {
@@ -64,7 +55,13 @@ contract HandlerHelpers is IERCHandler {
         _setBurnable(contractAddress);
     }
 
-    function withdraw(bytes memory data) external virtual override {}
+    /**
+        @notice Used to manually release funds from ERC safes.
+        @param tokenAddress Address of token contract to release.
+        @param recipient Address to release tokens to.
+        @param amountOrTokenID Either the amount of ERC20 tokens or the ERC721 token ID to release.
+     */
+    function withdraw(address tokenAddress, address recipient, uint256 amountOrTokenID) external virtual override {}
 
     function _setResource(bytes32 resourceID, address contractAddress) internal {
         _resourceIDToTokenContractAddress[resourceID] = contractAddress;

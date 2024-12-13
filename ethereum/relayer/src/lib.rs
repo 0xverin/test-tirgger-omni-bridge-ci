@@ -28,16 +28,18 @@ use alloy::sol;
 use alloy::transports::http::{Client, Http};
 use async_trait::async_trait;
 use bridge_core::key_store::KeyStore;
+use bridge_core::listener::DepositRecord;
 use bridge_core::relay::Relayer;
 use log::error;
 
 pub mod key_store;
 
+// TODO: Update this bridge instance
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
     Bridge,
-    "../../ethereum/bridge-contracts/out/Bridge.sol/Bridge.json"
+    "../../ethereum/chainbridge-contracts/out/Bridge.sol/Bridge.json"
 );
 
 /// Relays bridge request to smart contracts deployed on ethereum based network.
@@ -56,6 +58,7 @@ pub struct EthereumRelayer {
     >,
 }
 
+// TODO: We need to configure gas options 
 impl EthereumRelayer {
     pub fn new(
         rpc_url: &str,
@@ -77,6 +80,7 @@ impl EthereumRelayer {
                     .map_err(|e| error!("Could not parse rpc url"))?,
             );
 
+        // TODO: Update this bridge instance 
         let bridge_instance = Bridge::new(
             Address::from_slice(
                 &decode(bridge_address).map_err(|e| error!("Can't decode bridge address"))?,
@@ -96,34 +100,31 @@ impl EthereumRelayer {
     }
 }
 
+
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(&self, data: Vec<u8>) -> Result<(), ()> {
-        //todo: error handling
-        //todo: amount and account from data
-        let withdraw_builder = self.bridge_instance.payOut(
-            U256::from_str_radix("10", 10).map_err(|e| {
-                error!("Could not parse amount: {:?}", e);
-            })?,
-            Address::from_slice(
-                &decode("0x70997970C51812dc3A010C7d01b50e0d17dc79C8").map_err(|e| {
-                    error!("Could not create address: {:?}", e);
-                })?,
-            ),
-        );
-        // todo: what if relayer sends it but fails to watch ( connection lost ) ? when do we assume it's relayed ?
-        // todo: fees?
-        withdraw_builder
-            .send()
-            .await
-            .map_err(|e| {
-                error!("Error while sending tx: {:?}", e);
-            })?
-            .watch()
-            .await
-            .map_err(|e| {
-                error!("Error while watching tx: {:?}", e);
-            })?;
+    async fn relay(&self, data: Vec<DepositRecord>) -> Result<(), ()> {
+
+        // get the first item 
+        let record = &data[0]; 
+
+        // TODO: Having trouble with building the proposal
+        // let proposal_builder = self.bridge_instance.voteProposal(
+        //     record.destination_chain_id, 
+        //     reocrd.nonce, 
+        //     record.resource_id
+        // )
+        // withdraw_builder
+        //     .send()
+        //     .await
+        //     .map_err(|e| {
+        //         error!("Error while sending tx: {:?}", e);
+        //     })?
+        //     .watch()
+        //     .await
+        //     .map_err(|e| {
+        //         error!("Error while watching tx: {:?}", e);
+        //     })?;
         Ok(())
     }
 }

@@ -15,6 +15,8 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
+use alloy::primitives::{U256, Address, Bytes, FixedBytes};
+use std::str::FromStr;
 
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
@@ -48,6 +50,18 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct DepositRecord {
+    pub token_address: Address,                // Solidity "address" -> Alloy "Address"
+    pub destination_chain_id: u8,             // Solidity "uint8" -> Rust "u8"
+    pub resource_id: FixedBytes<32>,                // Solidity "bytes32" -> Fixed-size Rust array
+    pub destination_recipient_address: Bytes, // Solidity "bytes" -> Rust Vec<u8>
+    pub depositer: Address,                   // Solidity "address" -> Alloy "Address"
+    pub amount: U256,
+    pub nonce: u64                         // Solidity "uint" (uint256) -> Alloy "U256"
+}
+
 
 /// Core component, used to listen to source chain and relay bridge request to destination chain.
 /// Requires specific implementations of:
@@ -167,11 +181,8 @@ impl<
                         let maybe_relayer = match self.relay {
                             Relay::Single(ref relay) => Some(relay),
                             Relay::Multi(ref relayers) => {
-                                if let Some(event_source_id) = event.maybe_event_source {
-                                    relayers.get(&event_source_id)
-                                } else {
-                                    None
-                                }
+                                // By default, For now we will not support multi
+                                None
                             }
                         };
                         if let Some(relayer) = maybe_relayer {
@@ -180,28 +191,25 @@ impl<
                                 .get()
                                 .expect("Could not read checkpoint")
                             {
-                                if checkpoint.lt(&event.id.clone().into()) {
+                                if checkpoint.lt(&event.nonce.clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(e) = self.handle.block_on(relayer.relay(vec![])) {
+                                    if let Err(e) = self.handle.block_on(relayer.relay(vec![event.clone()])) {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
-                                        // it will try again in next loop
                                         continue 'main;
                                     }
                                 } else {
                                     log::debug!("Skipping event");
                                 }
                             } else {
-                                log::info!("Relaying");
                                 if let Err(e) = self.handle.block_on(relayer.relay(vec![])) {
                                     log::info!("Could not relay");
                                     sleep(Duration::from_secs(1));
-                                    // it will try again in next loop
                                     continue 'main;
                                 }
                             }
                             self.checkpoint_repository
-                                .save(event.id.into())
+                                .save(event.nonce.into())
                                 .expect("Could not save checkpoint");
                         }
                     }

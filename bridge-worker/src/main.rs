@@ -50,7 +50,7 @@ async fn main() -> Result<(), ()> {
     })?;
 
     handles.push(sync_sepolia().unwrap());
-    handles.push(sync_litentry_rococo().await.unwrap());
+    // handles.push(sync_litentry_rococo().await.unwrap());
 
     for handle in handles {
         handle.join().unwrap()
@@ -78,7 +78,7 @@ async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
 
     let mut substrate_listener = substrate_listener::create_listener::<
         CustomConfig,
-        substrate_listener::litentry_rococo::pallet_bridge::events::PaidIn,
+        substrate_listener::litentry_rococo::ChainBridge::events::FungibleTransfer,
     >(
         "litenty_rococo",
         Handle::current(),
@@ -107,11 +107,7 @@ fn sync_sepolia() -> Result<JoinHandle<()>, ()> {
         Handle::current(),
         "http://ethereum-node:8545",
         // "https://sepolia.infura.io/v3/26255715664b4092add78bac6d995719",
-        vec![(
-            // address of bridge smart contract
-            "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-            Box::new(relayer),
-        )],
+        relayer,
         finalization_gap_blocks,
         stop_receiver,
     )?;

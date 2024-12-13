@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::listener::PayIn;
+use crate::listener::DepositRecord;
 use async_trait::async_trait;
 
 /// Returns the last finalized block number
@@ -32,5 +32,5 @@ pub trait BlockPayInEventsFetcher<Id: Clone, EventSourceId: Clone> {
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<PayIn<Id, EventSourceId>>, ()>;
+    ) -> Result<Vec<DepositRecord>, ()>;
 }

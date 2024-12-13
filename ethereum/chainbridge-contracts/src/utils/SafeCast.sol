@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.11;
-
+pragma solidity 0.6.12;
 
 library SafeCast {
     function toUint200(uint256 value) internal pure returns (uint200) {

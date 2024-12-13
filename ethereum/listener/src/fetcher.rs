@@ -26,14 +26,22 @@ use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use bridge_core::listener::PayIn;
 use std::collections::HashSet;
+use bridge_core::listener::DepositRecord;
 
-pub static EVENT_TOPIC: &str = "PaidIn(uint256,bytes)";
+pub static DEPOSIT_EVENT_TOPIC: &str = "Deposit(uint8,bytes32,uint64)";
 
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
-    Bridge,
-    "../bridge-contracts/out/Bridge.sol/Bridge.json"
+    ChainBridge,
+    "../chainbridge-contracts/out/Bridge.sol/Bridge.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    ERC20Handler,
+    "../chainbridge-contracts/out/ERC20Handler.sol/ERC20Handler.json"
 );
 
 /// Used for fetching data from ethereum based chains required by the `Listener`
@@ -50,7 +58,7 @@ impl<C> Fetcher<C> {
             finalization_gap_blocks,
             client,
             event_sources,
-            event_topic: keccak256(EVENT_TOPIC.as_bytes()),
+            event_topic: keccak256(DEPOSIT_EVENT_TOPIC.as_bytes()),
         }
     }
 }
@@ -67,35 +75,47 @@ impl<C: EthereumRpcClient + Sync + Send> LastFinalizedBlockNumFetcher for Fetche
 impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, EventSourceId>
     for Fetcher<C>
 {
+
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<PayIn<PayInEventId, EventSourceId>>, ()> {
+    ) -> Result<Vec<DepositRecord>, ()> {
+
         let block_logs = self
             .client
             .get_block_logs(
                 block_num,
                 Vec::from_iter(self.event_sources.clone()),
-                EVENT_TOPIC,
+                DEPOSIT_EVENT_TOPIC,
             )
             .await?;
-        let logs: Vec<PayIn<PayInEventId, EventSourceId>> = block_logs
+
+        log::debug!("Checking log details for block number: {:?}", block_num);
+        log::debug!("Checking log details for contract: {:?}", self.event_sources);
+        log::debug!("Checking log details for topic: {:?}", self.event_topic);
+        log::debug!("Size of the logs received via RPC: {:?}", block_logs.len());
+        log::debug!("Logs in the buffer: {:?}", block_logs);
+        
+        let deposit_events: Vec<(u8, u64)> = block_logs
             .into_iter()
             .filter(|log| {
-                self.event_sources.contains(&log.address) && log.topics.contains(&self.event_topic)
+                self.event_sources.contains(&log.address) &&  log.topics.contains(&self.event_topic)
             })
             .map(|log| {
-                let event = Bridge::PaidIn::abi_decode_data(&log.data, false).unwrap();
-                let amount = event.0.to();
-                let data = event.1.to_vec();
-                // 256 bits to 128 bits conversion - we might be losing some important bits here ;/
-                PayIn::new(log.id, Some(log.address), amount, data)
-            })
-            .collect();
-        if !logs.is_empty() {
-            log::info!("Got contract events: {:?}", logs);
+                let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
+                log::debug!("Got contract events: {:?}", event);
+
+                (event.0, event.2)
+            }).collect();
+
+        let mut records: Vec<DepositRecord> = vec![];
+
+        for x in deposit_events {
+            records.push(self.client.get_deposit_record(x.0, x.1).await);
         }
-        Ok(logs)
+       
+        log::info!("Found {:?} Deposits on Ethereum", record.len());
+        Ok(records)
     }
 }
 

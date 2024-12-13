@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity 0.8.11;
+pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/presets/ERC20PresetMinterPauser.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 
 /**
     @title Manages deposited ERC20s.
@@ -13,6 +13,17 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
  */
 contract ERC20Safe {
     using SafeMath for uint256;
+
+    /**
+        @notice Used to transfer tokens into the safe to fund proposals.
+        @param tokenAddress Address of ERC20 to transfer.
+        @param owner Address of current token owner.
+        @param amount Amount of tokens to transfer.
+     */
+    function fundERC20(address tokenAddress, address owner, uint256 amount) public {
+        IERC20 erc20 = IERC20(tokenAddress);
+        _safeTransferFrom(erc20, owner, address(this), amount);
+    }
 
     /**
         @notice Used to gain custody of deposited token.
@@ -87,13 +98,7 @@ contract ERC20Safe {
         @param token Token instance call targets
         @param data encoded call data
      */
-    function _safeCall(IERC20 token, bytes memory data) private {
-        uint256 tokenSize;
-        assembly {
-            tokenSize := extcodesize(token)
-        }         
-        require(tokenSize > 0, "ERC20: not a contract");
-
+    function _safeCall(IERC20 token, bytes memory data) private {        
         (bool success, bytes memory returndata) = address(token).call(data);
         require(success, "ERC20: call failed");
 

@@ -18,6 +18,8 @@ use alloy::hex::decode;
 use alloy::signers::k256::ecdsa::SigningKey;
 use bridge_core::key_store::KeyStore;
 
+
+// TODO: Can this read key from file and ask for password?
 /// Generates and stores keys used by `EthereumRelayer`
 pub struct EthereumKeyStore {
     path: String,

@@ -16,7 +16,7 @@
 
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
-use bridge_core::listener::PayIn;
+use bridge_core::listener::DepositRecord;
 use log::error;
 
 use crate::rpc_client::SubstrateRpcClientFactory;
@@ -78,19 +78,26 @@ impl<
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<PayIn<PayInEventId, ()>>, ()> {
+    ) -> Result<Vec<DepositRecord>, ()> {
         self.connect_if_needed().await;
 
         if let Some(ref mut client) = self.client {
-            client
+            let events = client
                 .get_block_pay_in_events(block_num)
-                .await
-                .map(|events| {
-                    events
-                        .into_iter()
-                        .map(|event| PayIn::new(event.id, None, 0, vec![]))
-                        .collect()
-                })
+                .await.unwrap(); 
+            let deposit_records: Vec<DepositRecord> = events.iter().map(|event|
+                DepositRecord {
+                    token_address: Default::default(),
+                    destination_chain_id: event.0,
+                    resource_id: event.2,
+                    destination_recipient_address: event.4,
+                    depositer: Default::default(),
+                    amount: event.3,
+                    nonce: event.1,
+                }
+            ).collect();
+
+            Ok(vec![])
         } else {
             Ok(vec![])
         }

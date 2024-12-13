@@ -10,3 +10,6 @@
 [submodule "ethereum/bridge-contracts/lib/openzeppelin-contracts-upgradeable"]
 	path = ethereum/bridge-contracts/lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+[submodule "ethereum/chainbridge-contracts/lib/openzeppelin-contracts"]
+	path = ethereum/chainbridge-contracts/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.11;
+pragma solidity 0.6.12;
 
 
 /**
@@ -27,7 +27,7 @@ contract Pausable {
     /**
      * @dev Initializes the contract in unpaused state.
      */
-    constructor () {
+    constructor () internal {
         _paused = false;
     }
 
@@ -72,27 +72,25 @@ contract Pausable {
 
     /**
      * @dev Triggers stopped state.
-     * @param sender Address which executes pause.
      *
      * Requirements:
      *
      * - The contract must not be paused.
      */
-    function _pause(address sender) internal virtual whenNotPaused {
+    function _pause() internal virtual whenNotPaused {
         _paused = true;
-        emit Paused(sender);
+        emit Paused(msg.sender);
     }
 
     /**
      * @dev Returns to normal state.
-     * @param sender Address which executes unpause.
      *
      * Requirements:
      *
      * - The contract must be paused.
      */
-    function _unpause(address sender) internal virtual whenPaused {
+    function _unpause() internal virtual whenPaused {
         _paused = false;
-        emit Unpaused(sender);
+        emit Unpaused(msg.sender);
     }
 }

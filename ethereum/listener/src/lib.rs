@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::fetcher::Fetcher;
 use alloy::primitives::Address;
@@ -39,7 +39,7 @@ pub fn create_listener(
     id: &str,
     handle: Handle,
     http_rpc_endpoint: &str,
-    relays: Vec<(&str, Box<dyn Relayer>)>,
+    relays: Box<dyn Relayer>,
     finalization_gap_blocks: u64,
     stop_signal: Receiver<()>,
 ) -> Result<EthereumListener<EthersRpcClient, FileCheckpointRepository>, ()> {
@@ -48,16 +48,11 @@ pub fn create_listener(
     })?;
     let last_processed_log_repository = FileCheckpointRepository::new("data/ethereum_last_log.bin");
 
-    let mut relay_map = HashMap::new();
-
-    for (address, relay) in relays {
-        relay_map.insert(Address::from_str(address).map_err(|_| ())?, relay);
-    }
-
+    // TODO: Values should be receieved via CLAP instead of hardcoding
     let fetcher: Fetcher<EthersRpcClient> = Fetcher::new(
         finalization_gap_blocks,
         client,
-        relay_map.keys().copied().collect(),
+        HashSet::from([Address::from_str("0x5FbDB2315678afecb367f032d93F642f64180aa3").unwrap()])
     );
 
     let ethereum_listener: EthereumListener<EthersRpcClient, FileCheckpointRepository> =
@@ -65,7 +60,7 @@ pub fn create_listener(
             id,
             handle,
             fetcher,
-            relay::Relay::Multi(relay_map),
+            relay::Relay::Single(relays),
             stop_signal,
             last_processed_log_repository,
         )
