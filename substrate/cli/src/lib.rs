@@ -16,19 +16,23 @@
 
 use clap::Subcommand;
 use std::str::FromStr;
+use std::thread::sleep;
 use subxt::ext::scale_value::stringify::custom_parsers::parse_hex;
 use subxt::tx::Signer;
 use subxt::utils::AccountId32;
 use subxt::{OnlineClient, PolkadotConfig};
-use subxt_signer::ecdsa::dev;
+use subxt_signer::sr25519::dev;
+use crate::litentry_rococo::runtime_types::rococo_parachain_runtime::RuntimeCall;
+use crate::litentry_rococo::chain_bridge::Call;
+use hex::FromHex;
+use crate::litentry_rococo::runtime_types::pallet_bridge_common::AssetInfo;
 
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/metadata.scale")]
 pub mod litentry_rococo {}
 
 #[derive(Subcommand)]
 pub enum SubstrateCommand {
-    PayIn { amount: String },
-    AddRelayer { account: String },
+    SetupDevChainBridge
 }
 
 pub async fn handle(command: &SubstrateCommand) {
@@ -36,31 +40,80 @@ pub async fn handle(command: &SubstrateCommand) {
     let alice_signer = dev::alice();
     log::info!("Alice: {:?}", alice_signer);
 
+    let api = OnlineClient::<PolkadotConfig>::from_insecure_url(rpc_url)
+    .await
+    .unwrap();
+
     match command {
-        SubstrateCommand::PayIn { amount } => {
-            let call = litentry_rococo::tx()
-                .pallet_bridge()
-                .pay_in(10, [0; 32].to_vec());
-            let api = OnlineClient::<PolkadotConfig>::from_insecure_url(rpc_url)
-                .await
-                .unwrap();
+        SubstrateCommand::SetupDevChainBridge => {
+            let add_relayer_call = RuntimeCall::ChainBridge(
+                Call::add_relayer{v: alice_signer.public_key().into()}
+            );
+
+            let add_relayer_sudo_call = litentry_rococo::tx()
+                .sudo()
+                .sudo(add_relayer_call);
+
             let hash = api
                 .tx()
-                .sign_and_submit_then_watch(&call, &alice_signer, Default::default())
+                .sign_and_submit_then_watch(&add_relayer_sudo_call, &alice_signer, Default::default())
                 .await
                 .unwrap();
+
             hash.wait_for_finalized().await.unwrap();
-        }
-        SubstrateCommand::AddRelayer { account } => {
-            let call = litentry_rococo::tx()
-                .pallet_bridge()
-                .add_relayer(AccountId32::from_str(account).unwrap());
-            let api = OnlineClient::<PolkadotConfig>::from_insecure_url(rpc_url)
-                .await
-                .unwrap();
+
+            let whitelist_chain_id = RuntimeCall::ChainBridge(
+                Call::whitelist_chain{id: 0}
+            );
+
+            let whitelist_chain_id_sudo_call = litentry_rococo::tx()
+                .sudo()
+                .sudo(whitelist_chain_id);
+
             let hash = api
                 .tx()
-                .sign_and_submit_then_watch(&call, &alice_signer, Default::default())
+                .sign_and_submit_then_watch(&whitelist_chain_id_sudo_call, &alice_signer, Default::default())
+                .await
+                .unwrap();
+
+            hash.wait_for_finalized().await.unwrap();
+
+            let set_threshold_call = RuntimeCall::ChainBridge(
+                Call::set_threshold{threshold: 1}
+            );
+
+            let set_threshold_sudo_call = litentry_rococo::tx()
+                .sudo()
+                .sudo(set_threshold_call);
+
+            let hash = api
+                .tx()
+                .sign_and_submit_then_watch(&set_threshold_sudo_call, &alice_signer, Default::default())
+                .await
+                .unwrap();
+
+            hash.wait_for_finalized().await.unwrap();
+
+            let resource_id = <[u8; 32]>::from_hex("6dbf3f9d61108d592cb424722ba78a9c2e786a3d1436508c9a02d7e48d70e41e").expect("Failed to decode hex string");
+            let asset = AssetInfo {
+                fee: 0, 
+                asset: None
+            };
+
+            let set_resource_call = RuntimeCall::AssetsHandler(
+                litentry_rococo::assets_handler::Call::set_resource {
+                    resource_id,
+                    asset
+                }
+            );
+
+            let set_resource_sudo_call = litentry_rococo::tx()
+                .sudo()
+                .sudo(set_resource_call);
+
+            let hash = api
+                .tx()
+                .sign_and_submit_then_watch(&set_resource_sudo_call, &alice_signer, Default::default())
                 .await
                 .unwrap();
 

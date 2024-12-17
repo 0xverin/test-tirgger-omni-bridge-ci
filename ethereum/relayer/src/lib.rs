@@ -71,6 +71,9 @@ impl EthereumRelayer {
                 .read()
                 .map_err(|e| error!("Can't read key store: {:?}", e))?,
         );
+
+        log::debug!("The address of the local signer: {:?}", signer.address());
+
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
@@ -81,7 +84,6 @@ impl EthereumRelayer {
                     .map_err(|e| error!("Could not parse rpc url"))?,
             );
 
-        // TODO: Update this bridge instance 
         let bridge_instance = Bridge::new(
             Address::from_slice(
                 &decode(bridge_address).map_err(|e| error!("Can't decode bridge address"))?,
@@ -128,6 +130,8 @@ impl Relayer for EthereumRelayer {
                 .map_err(|e| {
                     error!("Error while watching tx: {:?}", e);
                 })?;
+            
+            log::info!("Succesfully submitted voteProposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
         }
         Ok(())
     }
