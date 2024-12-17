@@ -17,6 +17,7 @@
 use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
 use bridge_core::key_store::KeyStore;
+use bridge_core::primitives::ChainEvents;
 use bridge_core::relay::Relayer;
 use bridge_core::listener::DepositRecord;
 use log::error;
@@ -24,11 +25,13 @@ use std::marker::PhantomData;
 use subxt::utils::AccountId32;
 use subxt::{Config, OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::dev;
+use crate::litentry_rococo::runtime_types::rococo_parachain_runtime::RuntimeCall;
+use crate::litentry_rococo::bridge_transfer::Call;
 
 pub mod key_store;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/metadata.scale")]
 pub mod litentry_rococo {}
 
 pub type CONF = PolkadotConfig;
@@ -52,13 +55,18 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, data: Vec<DepositRecord>) -> Result<(), ()> {
-        // We only take the first data 
-        let deposit_record = data[0];
+    async fn relay(&self, data: ChainEvents) -> Result<(), ()> {
+        let (amount, rid, to, nonce) = data.get_bridge_transfer_arguments().unwrap();
         
+        log::debug!("Submitting bridge_transfer extrinsic, amount: {:?}, to: {:?}", amount, to);
+
+        let bridge = RuntimeCall::BridgeTransfer (
+            Call::transfer{to, amount, rid: rid.clone()},
+        );
+
         let call = litentry_rococo::tx()
-            .bridge_transfer
-            .transfer(deposit_record.destination_recipient_address, deposit_record.amount, deposit_record.resource_id);
+            .chain_bridge()
+            .acknowledge_proposal(nonce, 0, rid, bridge);
 
         let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
             .await
@@ -74,6 +82,8 @@ impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
             })?;
 
         let alice_signer = dev::alice();
+
+        // TODO: This should be submit and watch
         let hash = api
             .tx()
             .sign_and_submit(&call, &alice_signer, Default::default())
@@ -81,6 +91,13 @@ impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
             .map_err(|e| {
                 error!("Could not submit tx: {:?}", e);
             });
+        
+        // Note: Hash doesn't guranttee success of extrinsic
+        if let Ok(hash_of) = hash {
+            log::debug!("Submtted extrinsic succesfully: {:?}", hash_of);
+        } else {
+            log::error!("Failed to submit extrinsics succesfully");
+        }
 
         Ok(())
     }

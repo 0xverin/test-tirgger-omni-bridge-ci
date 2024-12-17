@@ -19,3 +19,4 @@ pub mod key_store;
 pub mod listener;
 pub mod relay;
 pub mod sync_checkpoint_repository;
+pub mod primitives;

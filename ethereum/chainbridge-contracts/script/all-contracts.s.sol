@@ -31,6 +31,8 @@ contract DeployAllContracts is Script {
         uint256 initialRelayerThreshold = 1;
         uint256 fee = 0;
         uint256 expiry = 0;
+        bytes32 resource_id = keccak256(abi.encodePacked("bridgeTransfer.transfer"));
+
 
         // Deploy the bridge contract 
         Bridge bridge = new Bridge(domainID, initialRelayers, initialRelayerThreshold, fee, expiry);
@@ -48,9 +50,7 @@ contract DeployAllContracts is Script {
         Lit token = new Lit("Litentry", "LIT", 10000 * 10 ** 18);
 
         address token_address = address(token);
-        address handler_address = address(handler);
-        bytes32 resource_id = keccak256(abi.encodePacked("bridgeTransfer.transfer"));
-        
+        address handler_address = address(handler);        
         // Admin add resource 
         bridge.adminSetResource(handler_address, resource_id, token_address);
 

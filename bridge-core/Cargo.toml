@@ -9,4 +9,4 @@ async-trait = { workspace = true }
 log = { workspace = true }
 parity-scale-codec = { workspace = true, features = ["derive"] }
 alloy = { workspace = true, features = ["rpc", "rpc-types", "dyn-abi", "contract"] }
-
+subxt = "0.37.0"

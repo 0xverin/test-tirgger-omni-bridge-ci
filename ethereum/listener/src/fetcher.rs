@@ -27,6 +27,7 @@ use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher
 use bridge_core::listener::PayIn;
 use std::collections::HashSet;
 use bridge_core::listener::DepositRecord;
+use bridge_core::primitives::ChainEvents;
 
 pub static DEPOSIT_EVENT_TOPIC: &str = "Deposit(uint8,bytes32,uint64)";
 
@@ -76,10 +77,10 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
     for Fetcher<C>
 {
 
-    async fn get_block_pay_in_events(
+    async fn get_chain_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<DepositRecord>, ()> {
+    ) -> Result<Vec<ChainEvents>, ()> {
 
         let block_logs = self
             .client
@@ -108,13 +109,14 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                 (event.0, event.2)
             }).collect();
 
-        let mut records: Vec<DepositRecord> = vec![];
+        let mut records: Vec<ChainEvents> = vec![];
 
         for x in deposit_events {
-            records.push(self.client.get_deposit_record(x.0, x.1).await);
+            let deposit = self.client.get_deposit_record(x.0, x.1).await;
+            records.push(ChainEvents::EthereumDepositEvent(deposit));
         }
        
-        log::info!("Found {:?} Deposits on Ethereum", record.len());
+        log::info!("Found {:?} Deposits on Ethereum", records.len());
         Ok(records)
     }
 }

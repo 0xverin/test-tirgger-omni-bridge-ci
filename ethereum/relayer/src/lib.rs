@@ -31,6 +31,7 @@ use bridge_core::key_store::KeyStore;
 use bridge_core::listener::DepositRecord;
 use bridge_core::relay::Relayer;
 use log::error;
+use bridge_core::primitives::{ChainEvents, TransferFungible};
 
 pub mod key_store;
 
@@ -103,28 +104,31 @@ impl EthereumRelayer {
 
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(&self, data: Vec<DepositRecord>) -> Result<(), ()> {
+    async fn relay(&self, data: ChainEvents) -> Result<(), ()> {
+        if let ChainEvents::SubstrateWithdrawEvent(transfer_fungible) = data {
+            let transfer = transfer_fungible.clone();
+            let (destination_chain_id, nonce, resource_id, amount, recipient) = transfer_fungible.create_vote_proposal_args();
+            let (proposal_call_data, proposal_hash) = TransferFungible::create_call_data_and_hash(amount, recipient);
 
-        // get the first item 
-        let record = &data[0]; 
+            let proposal_builder = self.bridge_instance.voteProposal(
+                transfer.bridge_chain_id, 
+                transfer.deposit_nonce, 
+                resource_id.into(), 
+                proposal_hash.into()
+            ); 
 
-        // TODO: Having trouble with building the proposal
-        // let proposal_builder = self.bridge_instance.voteProposal(
-        //     record.destination_chain_id, 
-        //     reocrd.nonce, 
-        //     record.resource_id
-        // )
-        // withdraw_builder
-        //     .send()
-        //     .await
-        //     .map_err(|e| {
-        //         error!("Error while sending tx: {:?}", e);
-        //     })?
-        //     .watch()
-        //     .await
-        //     .map_err(|e| {
-        //         error!("Error while watching tx: {:?}", e);
-        //     })?;
+            proposal_builder
+                .send()
+                .await
+                .map_err(|e| {
+                    error!("Error while sending tx: {:?}", e);
+                })?
+                .watch()
+                .await
+                .map_err(|e| {
+                    error!("Error while watching tx: {:?}", e);
+                })?;
+        }
         Ok(())
     }
 }

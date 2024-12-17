@@ -22,6 +22,7 @@ use subxt::backend::BlockRef;
 use subxt::config::Header;
 use subxt::events::{EventsClient, StaticEvent};
 use subxt::{Config, OnlineClient};
+use crate::litentry_rococo::chain_bridge::events::FungibleTransfer;
 
 pub struct BlockEvent<T> {
     pub id: EventId,
@@ -38,12 +39,12 @@ pub struct PayInEvent {}
 
 /// For fetching data from Substrate RPC node
 #[async_trait]
-pub trait SubstrateRpcClient {
+pub trait SubstrateRpcClient{
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()>;
-    async fn get_block_pay_in_events(
+    async fn get_fungible_transfer_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()>;
+    ) -> Result<Vec<FungibleTransfer>, ()>;
 }
 
 pub struct RpcClient<ChainConfig: Config, PayInEventType: StaticEvent> {
@@ -74,10 +75,10 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
             None => Err(()),
         }
     }
-    async fn get_block_pay_in_events(
+    async fn get_fungible_transfer_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<PayInEventType>, ()> {
+    ) -> Result<Vec<FungibleTransfer>, ()> {
         match self
             .legacy
             .chain_get_block_hash(Some(block_num.into()))
@@ -91,9 +92,11 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
                     .await
                     .map_err(|_| ())?;
 
-                let pay_in_events = events.find::<PayInEventType>();
+                let fungible_events = events.find::<FungibleTransfer>();
 
-                Ok(pay_in_events)
+                let fungible_events: Vec<FungibleTransfer> = fungible_events.into_iter().map(|ev| ev.unwrap()).collect();
+                log::debug!("Found {:?} fungible events in block: {:?}", fungible_events.len(), block_num);
+                Ok(fungible_events)
             }
             None => Err(()),
         }
@@ -132,10 +135,10 @@ impl SubstrateRpcClient for MockedRpcClient {
         Ok(self.block_num)
     }
 
-    async fn get_block_pay_in_events(
+    async fn get_fungible_transfer_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
+    ) -> Result<Vec<FungibleTransfer>, ()> {
         Ok(vec![])
     }
 }

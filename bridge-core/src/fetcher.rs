@@ -16,6 +16,7 @@
 
 use crate::listener::DepositRecord;
 use async_trait::async_trait;
+use crate::primitives::ChainEvents;
 
 /// Returns the last finalized block number
 #[async_trait]
@@ -29,8 +30,8 @@ pub trait LastFinalizedBlockNumFetcher {
 /// fetch events from all of them together.
 #[async_trait]
 pub trait BlockPayInEventsFetcher<Id: Clone, EventSourceId: Clone> {
-    async fn get_block_pay_in_events(
+    async fn get_chain_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<DepositRecord>, ()>;
+    ) -> Result<Vec<ChainEvents>, ()>;
 }

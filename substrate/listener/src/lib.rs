@@ -33,7 +33,7 @@ use tokio::runtime::Handle;
 use tokio::sync::oneshot::Receiver;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/metadata.scale")]
 pub mod litentry_rococo {}
 
 // We don't need to construct this at runtime,

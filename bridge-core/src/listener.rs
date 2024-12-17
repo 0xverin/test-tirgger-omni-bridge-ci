@@ -17,6 +17,7 @@
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
 use alloy::primitives::{U256, Address, Bytes, FixedBytes};
 use std::str::FromStr;
+use subxt::utils::AccountId32;
 
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
@@ -60,6 +61,20 @@ pub struct DepositRecord {
     pub depositer: Address,                   // Solidity "address" -> Alloy "Address"
     pub amount: U256,
     pub nonce: u64                         // Solidity "uint" (uint256) -> Alloy "U256"
+}
+
+impl DepositRecord {
+    // Consume the event 
+    pub fn create_transfer_fungible_arguments(self) -> (u128, [u8;32], AccountId32) {
+        let amount: u128 = self.amount.try_into().unwrap();
+        let resource_id: [u8;32] = self.resource_id.clone().into();
+        let array: [u8; 32] = self.destination_recipient_address
+            .as_ref()
+            .try_into().unwrap();
+        let account: AccountId32 = AccountId32(array);
+
+        (amount, resource_id, account)
+    }
 }
 
 
@@ -175,7 +190,7 @@ impl<
             if last_finalized_block >= block_number_to_sync {
                 if let Ok(events) = self
                     .handle
-                    .block_on(self.fetcher.get_block_pay_in_events(block_number_to_sync))
+                    .block_on(self.fetcher.get_chain_events(block_number_to_sync))
                 {
                     for event in events {
                         let maybe_relayer = match self.relay {
@@ -191,25 +206,26 @@ impl<
                                 .get()
                                 .expect("Could not read checkpoint")
                             {
-                                if checkpoint.lt(&event.nonce.clone().into()) {
+                                // For now I'm not seeing the checkpoint 
+                                // if checkpoint.lt(&event.nonce().clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(e) = self.handle.block_on(relayer.relay(vec![event.clone()])) {
+                                    if let Err(e) = self.handle.block_on(relayer.relay(event.clone())) {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
                                         continue 'main;
                                     }
-                                } else {
+                                // } else {
                                     log::debug!("Skipping event");
-                                }
+                                // }
                             } else {
-                                if let Err(e) = self.handle.block_on(relayer.relay(vec![])) {
+                                if let Err(e) = self.handle.block_on(relayer.relay(event.clone())) {
                                     log::info!("Could not relay");
                                     sleep(Duration::from_secs(1));
                                     continue 'main;
                                 }
                             }
                             self.checkpoint_repository
-                                .save(event.nonce.into())
+                                .save(event.nonce().into())
                                 .expect("Could not save checkpoint");
                         }
                     }
