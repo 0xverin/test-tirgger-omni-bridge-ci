@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::thread::sleep;
+use std::time::Duration;
+
 use crate::key_store::EthereumKeyStore;
 use crate::Bridge::BridgeInstance;
 use alloy::hex::decode;
@@ -132,6 +135,34 @@ impl Relayer for EthereumRelayer {
                 })?;
             
             log::info!("Succesfully submitted voteProposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
+        
+            // We should also execute the proposal 
+            let proposal_executer = self.bridge_instance.executeProposal(
+                transfer.bridge_chain_id, 
+                transfer.deposit_nonce, 
+                proposal_call_data.into(), 
+                resource_id.into()
+            );
+
+            log::info!("Waiting for the proposal to pass...");
+            // Sleeping before the proposal passes
+            sleep(Duration::from_secs(2));
+
+            proposal_executer
+                .send()
+                .await
+                .map_err(|e| {
+                    error!("Error while sending tx: {:?}", e);
+                })?
+                .watch()
+                .await
+                .map_err(|e| {
+                    error!("Error while watching tx: {:?}", e);
+                })?;
+            
+            log::info!("Succesfully executed Proposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
+
+
         }
         Ok(())
     }

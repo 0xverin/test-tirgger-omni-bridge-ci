@@ -17,20 +17,3 @@ services:
     ports: 
       - "9944:9944"
     command: ["--dev", "--rpc-external"]
-  bridge-contract-deployer:
-    image: ghcr.io/foundry-rs/foundry
-    command:
-      - "cd /contracts && forge build && forge create Bridge --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --rpc-url http://ethereum-node:8545 --constructor-args 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-    volumes:
-      - ./ethereum/bridge-contracts:/contracts
-    depends_on:
-      - ethereum-node
-  lit-erc20-contract-deployer:
-    image: ghcr.io/foundry-rs/foundry
-    command:
-      - "forge create contracts/ERC20.sol:LITToken --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --rpc-url http://ethereum-node:8545"
-    volumes:
-      - ./artifacts/ethereum:/contracts
-    depends_on:
-      - ethereum-node
-      - bridge-contract-deployer

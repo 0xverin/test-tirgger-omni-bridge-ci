@@ -67,7 +67,11 @@ build-docker:
 
 .PHONY: start-local
 start-local:
-	docker-compose up
+	docker-compose up --force-recreate --build --remove-orphans
+
+.PHONY: start-local-e2e-test
+start-local-e2e-test:
+	./scripts/test-e2e-bridge.sh
 
 .PHONY: stop-local
 stop-local:
