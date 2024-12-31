@@ -1,0 +1,10 @@
+[package]
+name = "substrate-cli"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+clap = {workspace = true}
+subxt = "0.37.0"
+subxt-signer = { version = "0.37.0", features = ["subxt"]}
+log = { workspace = true }

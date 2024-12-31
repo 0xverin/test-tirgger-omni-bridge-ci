@@ -1,0 +1,10 @@
+[package]
+name = "ethereum-relayer"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+bridge-core = { path = "../../bridge-core" }
+async-trait = { workspace = true }
+alloy = { workspace = true, features = ["contract", "signer-local"]}
+log = { workspace = true }

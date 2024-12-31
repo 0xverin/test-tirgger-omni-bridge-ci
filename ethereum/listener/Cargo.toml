@@ -1,0 +1,15 @@
+[package]
+name = "ethereum-listener"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = {  workspace = true, features = ["macros", "rt-multi-thread"] }
+log = { workspace = true }
+bridge-core = { path = "../../bridge-core" }
+async-trait = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive"] }
+alloy = { workspace = true, features = ["rpc", "rpc-types", "dyn-abi", "contract"] }
+
+[dev-dependencies]
+env_logger = {  workspace = true }
