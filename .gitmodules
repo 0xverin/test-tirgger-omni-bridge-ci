@@ -13,3 +13,6 @@
 [submodule "ethereum/chainbridge-contracts/lib/openzeppelin-contracts"]
 	path = ethereum/chainbridge-contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "ethereum/chainbridge-contracts/lib/forge-std"]
+	path = ethereum/chainbridge-contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
