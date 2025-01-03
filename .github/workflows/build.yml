@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/dependabot.yml"
+      - "**/README.md"
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  DOCKER_BUILDKIT: 1
+  # the branch or tag on which this workflow is triggered
+  # `head_ref` will only be set if the triggering event is `pull_request`
+  REF_VERSION: ${{ github.head_ref || github.ref_name }}
+
+concurrency:
+  # see https://stackoverflow.com/questions/74117321/if-condition-in-concurrency-in-gha
+  # along with the `sequentialise` job below, it guarantees:
+  # - for push in dev: all triggered CIs will be run sequentially, none is cancelled
+  # - for PR: later triggered CIs will cancel previous runs, maximum one CI will be run
+  group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
