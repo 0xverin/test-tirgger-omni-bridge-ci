@@ -14,9 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
-use subxt::utils::AccountId32;
 
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
@@ -48,33 +46,6 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
             amount,
             data,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DepositRecord {
-    pub token_address: Address,      // Solidity "address" -> Alloy "Address"
-    pub destination_chain_id: u8,    // Solidity "uint8" -> Rust "u8"
-    pub resource_id: FixedBytes<32>, // Solidity "bytes32" -> Fixed-size Rust array
-    pub destination_recipient_address: Bytes, // Solidity "bytes" -> Rust Vec<u8>
-    pub depositer: Address,          // Solidity "address" -> Alloy "Address"
-    pub amount: U256,
-    pub nonce: u64, // Solidity "uint" (uint256) -> Alloy "U256"
-}
-
-impl DepositRecord {
-    // Consume the event
-    pub fn create_transfer_fungible_arguments(self) -> (u128, [u8; 32], AccountId32) {
-        let amount: u128 = self.amount.try_into().unwrap();
-        let resource_id: [u8; 32] = self.resource_id.clone().into();
-        let array: [u8; 32] = self
-            .destination_recipient_address
-            .as_ref()
-            .try_into()
-            .unwrap();
-        let account: AccountId32 = AccountId32(array);
-
-        (amount, resource_id, account)
     }
 }
 

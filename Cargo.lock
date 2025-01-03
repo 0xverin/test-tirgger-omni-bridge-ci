@@ -1119,11 +1119,9 @@ dependencies = [
 name = "bridge-core"
 version = "0.1.0"
 dependencies = [
- "alloy",
  "async-trait",
  "log",
  "parity-scale-codec",
- "subxt",
  "tokio",
 ]
 
@@ -1131,14 +1129,11 @@ dependencies = [
 name = "bridge-worker"
 version = "0.1.0"
 dependencies = [
- "bridge-core",
  "env_logger",
  "ethereum-listener",
  "ethereum-relayer",
  "hex",
  "log",
- "scale-encode 0.7.1",
- "serde_json",
  "substrate-listener",
  "substrate-relayer",
  "tokio",
