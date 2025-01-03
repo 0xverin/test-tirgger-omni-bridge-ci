@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use bridge_core::relay::Relayer;
 use log::debug;
 use std::marker::PhantomData;
+use subxt::utils::AccountId32;
 use subxt::{Config, PolkadotConfig};
 
 pub mod key_store;
@@ -49,7 +50,12 @@ impl<T: Config> SubstrateRelayer<T> {
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
     async fn relay(&self, amount: u128, _data: Vec<u8>) -> Result<(), ()> {
-        debug!("Relaying amount: {}", amount);
+        let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
+        let account: AccountId32 = AccountId32::from(account_bytes);
+        debug!("Relaying amount: {} to account: {:?}", amount, account);
+
+        //parse account id
+
         // let (amount, rid, to, nonce) = data.get_bridge_transfer_arguments().unwrap();
         //
         // log::debug!("Submitting bridge_transfer extrinsic, amount: {:?}, to: {:?}", amount, to);

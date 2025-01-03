@@ -7,3 +7,4 @@ edition.workspace = true
 clap = { workspace = true, features = ["derive"] }
 alloy = { workspace = true, features = ["contract", "signer-local"]}
 log = { workspace = true }
+subxt-core = "0.38.0"

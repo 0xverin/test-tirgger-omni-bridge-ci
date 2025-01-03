@@ -1,3 +1,4 @@
+use std::str::FromStr;
 // Copyright 2020-2024 Trust Computing GmbH.
 // This file is part of Litentry.
 //
@@ -28,10 +29,11 @@ use alloy::sol;
 use alloy::transports::http::{Client, Http};
 use clap::Subcommand;
 use log::info;
+use subxt_core::utils::AccountId32;
 
 #[derive(Subcommand)]
 pub enum EthereumCommand {
-    Bridge { amount: String },
+    Bridge { amount: String, to: String },
     AddRelayer { address: String },
     SetupBridge,
 }
@@ -79,7 +81,7 @@ pub async fn handle(command: &EthereumCommand) {
     let erc_20_handler_address =
         Address::from_slice(&decode(BRIDGE_ERC_20_HANDLER_ADDRESS).unwrap());
     match command {
-        EthereumCommand::Bridge { amount } => {
+        EthereumCommand::Bridge { amount, to } => {
             // transfer some tokens to user
             transfer_lit_to(user_address, amount, rpc_url).await;
             // approve lit spending to HEI contract
@@ -92,7 +94,7 @@ pub async fn handle(command: &EthereumCommand) {
             wrap_to(USER_PRIVATE_KEY, user_address, amount, rpc_url).await;
 
             // deposit on bridge instance
-            bridge_deposit(USER_PRIVATE_KEY, amount, rpc_url).await;
+            bridge_deposit(USER_PRIVATE_KEY, amount, to.to_owned(), rpc_url).await;
         }
         EthereumCommand::AddRelayer { address } => {
             add_relayer(
@@ -177,15 +179,17 @@ async fn setup_bridge(by_private_key: &str, rpc_url: &str) {
     builder_2.send().await.unwrap().watch().await.unwrap();
 }
 
-async fn bridge_deposit(by_private_key: &str, amount: &str, rpc_url: &str) {
+async fn bridge_deposit(by_private_key: &str, amount: &str, account: String, rpc_url: &str) {
     info!("Bridging deposit");
     let bridge_instance = bridge_instance(by_private_key, rpc_url).await;
     let resource_id = FixedBytes([0; 32]);
     // 0x + amount + address len + address (all 32 bytes padded)
     let amount = DynSolValue::Uint(U256::from_str_radix(amount, 10).unwrap(), 32).abi_encode();
-    let address_len = DynSolValue::Uint(U256::from(32), 32).abi_encode();
+    let account_id = AccountId32::from_str(account.as_str()).unwrap();
+    let address_len = DynSolValue::Uint(U256::from(account_id.0.len()), 32).abi_encode();
     // todo: use user specified address here
-    let address = DynSolValue::FixedBytes(B256::new([5; 32]), 32).abi_encode();
+    let address =
+        DynSolValue::FixedBytes(B256::new(account_id.0.try_into().unwrap()), 32).abi_encode();
 
     let mut bytes = vec![];
 
