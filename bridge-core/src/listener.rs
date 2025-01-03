@@ -30,6 +30,7 @@ pub struct PayIn<Id: Clone, EventSourceId: Clone> {
     id: Id,
     maybe_event_source: Option<EventSourceId>,
     amount: u128,
+    nonce: u64,
     data: Vec<u8>,
 }
 
@@ -38,12 +39,14 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
         id: Id,
         maybe_event_source: Option<EventSourceId>,
         amount: u128,
+        nonce: u64,
         data: Vec<u8>,
     ) -> Self {
         Self {
             id,
             maybe_event_source,
             amount,
+            nonce,
             data,
         }
     }
@@ -182,10 +185,11 @@ impl<
                             {
                                 if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(_) = self
-                                        .handle
-                                        .block_on(relayer.relay(event.amount, event.data))
-                                    {
+                                    if let Err(_) = self.handle.block_on(relayer.relay(
+                                        event.amount,
+                                        event.nonce,
+                                        event.data,
+                                    )) {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
                                         continue 'main;
@@ -194,10 +198,11 @@ impl<
                                     log::debug!("Skipping event");
                                 }
                             } else {
-                                if let Err(_) = self
-                                    .handle
-                                    .block_on(relayer.relay(event.amount, event.data))
-                                {
+                                if let Err(_) = self.handle.block_on(relayer.relay(
+                                    event.amount,
+                                    event.nonce,
+                                    event.data,
+                                )) {
                                     log::info!("Could not relay");
                                     sleep(Duration::from_secs(1));
                                     continue 'main;

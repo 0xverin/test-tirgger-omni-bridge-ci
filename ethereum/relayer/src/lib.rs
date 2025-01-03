@@ -102,8 +102,8 @@ impl EthereumRelayer {
 
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(&self, amount: u128, _data: Vec<u8>) -> Result<(), ()> {
-        debug!("Relaying amount: {}", amount);
+    async fn relay(&self, amount: u128, nonce: u64, _data: Vec<u8>) -> Result<(), ()> {
+        debug!("Relaying amount: {} with nonce: {}", amount, nonce);
 
         // if let ChainEvents::SubstrateWithdrawEvent(transfer_fungible) = data {
         //     let transfer = transfer_fungible.clone();

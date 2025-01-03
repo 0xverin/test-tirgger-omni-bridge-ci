@@ -88,7 +88,7 @@ impl<
                 .map(|events| {
                     events
                         .into_iter()
-                        .map(|event| PayIn::new(event.id, None, 0, vec![]))
+                        .map(|event| PayIn::new(event.id, None, 0, 0, vec![]))
                         .collect()
                 })
         } else {

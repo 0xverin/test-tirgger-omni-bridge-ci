@@ -49,10 +49,13 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, amount: u128, _data: Vec<u8>) -> Result<(), ()> {
+    async fn relay(&self, amount: u128, nonce: u64, _data: Vec<u8>) -> Result<(), ()> {
         let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
         let account: AccountId32 = AccountId32::from(account_bytes);
-        debug!("Relaying amount: {} to account: {:?}", amount, account);
+        debug!(
+            "Relaying amount: {} with nonce: {} to account: {:?}",
+            amount, nonce, account
+        );
 
         //parse account id
 

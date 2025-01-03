@@ -104,7 +104,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
             .map(|log| {
                 let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
                 log::debug!("Got contract events: {:?}", event);
-
+                let nonce = event.2;
                 let data = event.3;
 
                 let amount_bytes = &data[0..32];
@@ -114,6 +114,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                     log.id,
                     Some(log.address),
                     amount.try_into().unwrap(),
+                    nonce,
                     data.into(),
                 )
             })
@@ -155,7 +156,7 @@ mod test {
                 DynSolValue::Tuple(vec![
                     DynSolValue::Uint(U256::from(0), 8),
                     DynSolValue::Uint(U256::from(0), 256),
-                    DynSolValue::Address(Address::default()),
+                    DynSolValue::Uint(U256::from(1), 64),
                     DynSolValue::Bytes(event_data.to_vec()),
                     DynSolValue::Uint(U256::from(10), 256),
                 ])
@@ -171,6 +172,7 @@ mod test {
             PayInEventId::new(1, 1, 1),
             Some(source),
             10,
+            1,
             event_data,
         )];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
