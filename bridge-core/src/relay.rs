@@ -18,8 +18,6 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
-use crate::listener::DepositRecord;
-use crate::primitives::ChainEvents;
 
 /// Represents relayers assigned to `Listener` instance. For example PayIns from different smart contracts deployed on same EVM
 /// network may be relayed to different destination chains. Strictly speaking there is a correlation between event emitter and relayer.
@@ -31,9 +29,10 @@ pub enum Relay<Id> {
 /// Used to relay bridging request to destination chain
 #[async_trait]
 pub trait Relayer: Send {
-    async fn relay(&self, data: ChainEvents) -> Result<(), ()>;
+    async fn relay(&self, amount: u128, data: Vec<u8>) -> Result<(), ()>;
 }
 
+#[allow(dead_code)]
 pub struct MockRelayer {
     sender: mpsc::UnboundedSender<()>,
 }
@@ -45,9 +44,9 @@ impl MockRelayer {
     }
 }
 
-// #[async_trait]
-// impl Relayer for MockRelayer {
-//     async fn relay(&self, data: Vec<u8>) -> Result<(), ()> {
-//         self.sender.send(()).map_err(|_| ())
-//     }
-// }
+#[async_trait]
+impl Relayer for MockRelayer {
+    async fn relay(&self, _amount: u128, _data: Vec<u8>) -> Result<(), ()> {
+        self.sender.send(()).map_err(|_| ())
+    }
+}

@@ -14,14 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::thread::sleep;
-use std::time::Duration;
-
 use crate::key_store::EthereumKeyStore;
 use crate::Bridge::BridgeInstance;
 use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{Address, U256};
+use alloy::primitives::Address;
 use alloy::providers::fillers::{
     ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
@@ -31,10 +28,8 @@ use alloy::sol;
 use alloy::transports::http::{Client, Http};
 use async_trait::async_trait;
 use bridge_core::key_store::KeyStore;
-use bridge_core::listener::DepositRecord;
 use bridge_core::relay::Relayer;
-use log::error;
-use bridge_core::primitives::{ChainEvents, TransferFungible};
+use log::{debug, error};
 
 pub mod key_store;
 
@@ -62,7 +57,7 @@ pub struct EthereumRelayer {
     >,
 }
 
-// TODO: We need to configure gas options 
+// TODO: We need to configure gas options
 impl EthereumRelayer {
     pub fn new(
         rpc_url: &str,
@@ -84,12 +79,12 @@ impl EthereumRelayer {
             .on_http(
                 rpc_url
                     .parse()
-                    .map_err(|e| error!("Could not parse rpc url"))?,
+                    .map_err(|_| error!("Could not parse rpc url"))?,
             );
 
         let bridge_instance = Bridge::new(
             Address::from_slice(
-                &decode(bridge_address).map_err(|e| error!("Can't decode bridge address"))?,
+                &decode(bridge_address).map_err(|_| error!("Can't decode bridge address"))?,
             ),
             provider,
         );
@@ -106,64 +101,67 @@ impl EthereumRelayer {
     }
 }
 
-
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(&self, data: ChainEvents) -> Result<(), ()> {
-        if let ChainEvents::SubstrateWithdrawEvent(transfer_fungible) = data {
-            let transfer = transfer_fungible.clone();
-            let (destination_chain_id, nonce, resource_id, amount, recipient) = transfer_fungible.create_vote_proposal_args();
-            let (proposal_call_data, proposal_hash) = TransferFungible::create_call_data_and_hash(amount, recipient);
+    async fn relay(&self, amount: u128, _data: Vec<u8>) -> Result<(), ()> {
+        debug!("Relaying amount: {}", amount);
 
-            let proposal_builder = self.bridge_instance.voteProposal(
-                transfer.bridge_chain_id, 
-                transfer.deposit_nonce, 
-                resource_id.into(), 
-                proposal_hash.into()
-            ); 
-
-            proposal_builder
-                .send()
-                .await
-                .map_err(|e| {
-                    error!("Error while sending tx: {:?}", e);
-                })?
-                .watch()
-                .await
-                .map_err(|e| {
-                    error!("Error while watching tx: {:?}", e);
-                })?;
-            
-            log::info!("Succesfully submitted voteProposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
-        
-            // We should also execute the proposal 
-            let proposal_executer = self.bridge_instance.executeProposal(
-                transfer.bridge_chain_id, 
-                transfer.deposit_nonce, 
-                proposal_call_data.into(), 
-                resource_id.into()
-            );
-
-            log::info!("Waiting for the proposal to pass...");
-            // Sleeping before the proposal passes
-            sleep(Duration::from_secs(2));
-
-            proposal_executer
-                .send()
-                .await
-                .map_err(|e| {
-                    error!("Error while sending tx: {:?}", e);
-                })?
-                .watch()
-                .await
-                .map_err(|e| {
-                    error!("Error while watching tx: {:?}", e);
-                })?;
-            
-            log::info!("Succesfully executed Proposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
-
-
-        }
+        // if let ChainEvents::SubstrateWithdrawEvent(transfer_fungible) = data {
+        //     let transfer = transfer_fungible.clone();
+        //     let (destination_chain_id, nonce, resource_id, amount, recipient) = transfer_fungible.create_vote_proposal_args();
+        //     let (proposal_call_data, proposal_hash) = TransferFungible::create_call_data_and_hash(amount, recipient);
+        //
+        //     let proposal_builder = self.bridge_instance.voteProposal(
+        //         transfer.bridge_chain_id,
+        //         transfer.deposit_nonce,
+        //         resource_id.into(),
+        //         proposal_hash.into()
+        //     );
+        //
+        //     proposal_builder
+        //         .send()
+        //         .await
+        //         .map_err(|e| {
+        //             error!("Error while sending tx: {:?}", e);
+        //         })?
+        //         .watch()
+        //         .await
+        //         .map_err(|e| {
+        //             error!("Error while watching tx: {:?}", e);
+        //         })?;
+        //
+        //     log::info!("Succesfully submitted voteProposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
+        //
+        //     // We should also execute the proposal
+        //     let proposal_executer = self.bridge_instance.executeProposal(
+        //         transfer.bridge_chain_id,
+        //         transfer.deposit_nonce,
+        //         proposal_call_data.into(),
+        //         resource_id.into(),
+        //         // todo: false or true ?
+        //         false
+        //     );
+        //
+        //     log::info!("Waiting for the proposal to pass...");
+        //     // Sleeping before the proposal passes
+        //     sleep(Duration::from_secs(2));
+        //
+        //     proposal_executer
+        //         .send()
+        //         .await
+        //         .map_err(|e| {
+        //             error!("Error while sending tx: {:?}", e);
+        //         })?
+        //         .watch()
+        //         .await
+        //         .map_err(|e| {
+        //             error!("Error while watching tx: {:?}", e);
+        //         })?;
+        //
+        //     log::info!("Succesfully executed Proposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
+        //
+        //
+        // }
         Ok(())
     }
 }

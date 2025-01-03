@@ -79,7 +79,7 @@ stop-local:
 
 .PHONY: build-evm-contracts
 build-evm-contracts:
-	cd ethereum/bridge-contracts && forge build
+	cd ethereum/chainbridge-contracts && forge build
 
 .PHONY: get-bridge-pallet-metadata
 get-bridge-pallet-metadata:

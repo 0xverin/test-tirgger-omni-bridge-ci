@@ -1,6 +1,6 @@
 Ethereum bridge contract needs to be built first in order to interact with it's instance.
 
-`cd ../ethereum/bridge-contracts/ && forge build`
+`cd ../ethereum/chainbridge-contracts/ && forge build`
 
 # Setting up local env
 
@@ -19,14 +19,13 @@ For bridging ethereum -> substrate
 
 1. Add substrate account 5C7C2Z5sWbytvHpuLTvzKunnnRwQxft1jiqrLD5rhucQ5S9X as Admin on PalletBridge using sudo call through polkadotjs
 2. Add substrate relayer `./bridge-cli substrate add-relayer 5DFW6oheaiW3XMDaPFi7RYLsKdPimAaY8Ajz2zA6S4STHG1D`
-3. Fund user account `./bridge-cli ethereum transfer 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 10000`
-4. Approve bridge account `./bridge-cli ethereum approve 0x5FbDB2315678afecb367f032d93F642f64180aa3 10000`
-5. Pay in `./bridge-cli ethereum pay-in 10`
-6. You should see `PaidOut` event emitted on substrate chain
+3. Setup chainbridge contracts `./bridge-cli ethereum ethereum setup-bridge`
+4. Fund account with LIT tokens, swap them to HEI and execute chaindbridge deposit `./bridge-cli bridge 100`
+5. You should see `PaidOut` event emitted on substrate chain
 
 # Bridging using CLI
 
-Cli commands are divided into two groups [ethereum,substrate]. Pick one of them and execute `pay-in` command in order to trigger asset bridging.
+Cli commands are divided into two groups [ethereum,substrate]. Pick one of them and execute `pay-in`/`deposit` command in order to trigger asset bridging.
 
 ### Example
 Bridge tokens from substrate to the other end of the bridge (ethereum):

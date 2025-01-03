@@ -16,17 +16,10 @@
 
 use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
-use bridge_core::key_store::KeyStore;
-use bridge_core::primitives::ChainEvents;
 use bridge_core::relay::Relayer;
-use bridge_core::listener::DepositRecord;
-use log::error;
+use log::debug;
 use std::marker::PhantomData;
-use subxt::utils::AccountId32;
-use subxt::{Config, OnlineClient, PolkadotConfig};
-use subxt_signer::sr25519::dev;
-use crate::litentry_rococo::runtime_types::rococo_parachain_runtime::RuntimeCall;
-use crate::litentry_rococo::bridge_transfer::Call;
+use subxt::{Config, PolkadotConfig};
 
 pub mod key_store;
 
@@ -38,16 +31,16 @@ pub type CONF = PolkadotConfig;
 
 /// Relays bridge request to substrate node's runtime pallet.
 pub struct SubstrateRelayer<T: Config> {
-    rpc_url: String,
-    key_store: SubstrateKeyStore,
+    _rpc_url: String,
+    _key_store: SubstrateKeyStore,
     _phantom: PhantomData<T>,
 }
 
 impl<T: Config> SubstrateRelayer<T> {
     pub fn new(rpc_url: &str, key_store: SubstrateKeyStore) -> Self {
         Self {
-            rpc_url: rpc_url.to_string(),
-            key_store,
+            _rpc_url: rpc_url.to_string(),
+            _key_store: key_store,
             _phantom: PhantomData,
         }
     }
@@ -55,49 +48,50 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, data: ChainEvents) -> Result<(), ()> {
-        let (amount, rid, to, nonce) = data.get_bridge_transfer_arguments().unwrap();
-        
-        log::debug!("Submitting bridge_transfer extrinsic, amount: {:?}, to: {:?}", amount, to);
-
-        let bridge = RuntimeCall::BridgeTransfer (
-            Call::transfer{to, amount, rid: rid.clone()},
-        );
-
-        let call = litentry_rococo::tx()
-            .chain_bridge()
-            .acknowledge_proposal(nonce, 0, rid, bridge);
-
-        let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
-            .await
-            .map_err(|e| {
-                error!("Could not connect to node: {:?}", e);
-            })?;
-        let secret_key_bytes = self.key_store.read().map_err(|e| {
-            error!("Could not unseal key: {:?}", e);
-        })?;
-        let signer =
-            subxt_signer::sr25519::Keypair::from_secret_key(secret_key_bytes).map_err(|e| {
-                error!("Could not create secret key: {:?}", e);
-            })?;
-
-        let alice_signer = dev::alice();
-
-        // TODO: This should be submit and watch
-        let hash = api
-            .tx()
-            .sign_and_submit(&call, &alice_signer, Default::default())
-            .await
-            .map_err(|e| {
-                error!("Could not submit tx: {:?}", e);
-            });
-        
-        // Note: Hash doesn't guranttee success of extrinsic
-        if let Ok(hash_of) = hash {
-            log::debug!("Submtted extrinsic succesfully: {:?}", hash_of);
-        } else {
-            log::error!("Failed to submit extrinsics succesfully");
-        }
+    async fn relay(&self, amount: u128, _data: Vec<u8>) -> Result<(), ()> {
+        debug!("Relaying amount: {}", amount);
+        // let (amount, rid, to, nonce) = data.get_bridge_transfer_arguments().unwrap();
+        //
+        // log::debug!("Submitting bridge_transfer extrinsic, amount: {:?}, to: {:?}", amount, to);
+        //
+        // let bridge = RuntimeCall::BridgeTransfer (
+        //     Call::transfer{to, amount, rid: rid.clone()},
+        // );
+        //
+        // let call = litentry_rococo::tx()
+        //     .chain_bridge()
+        //     .acknowledge_proposal(nonce, 0, rid, bridge);
+        //
+        // let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
+        //     .await
+        //     .map_err(|e| {
+        //         error!("Could not connect to node: {:?}", e);
+        //     })?;
+        // let secret_key_bytes = self.key_store.read().map_err(|e| {
+        //     error!("Could not unseal key: {:?}", e);
+        // })?;
+        // let signer =
+        //     subxt_signer::sr25519::Keypair::from_secret_key(secret_key_bytes).map_err(|e| {
+        //         error!("Could not create secret key: {:?}", e);
+        //     })?;
+        //
+        // let alice_signer = dev::alice();
+        //
+        // // TODO: This should be submit and watch
+        // let hash = api
+        //     .tx()
+        //     .sign_and_submit(&call, &alice_signer, Default::default())
+        //     .await
+        //     .map_err(|e| {
+        //         error!("Could not submit tx: {:?}", e);
+        //     });
+        //
+        // // Note: Hash doesn't guranttee success of extrinsic
+        // if let Ok(hash_of) = hash {
+        //     log::debug!("Submtted extrinsic succesfully: {:?}", hash_of);
+        // } else {
+        //     log::error!("Failed to submit extrinsics succesfully");
+        // }
 
         Ok(())
     }

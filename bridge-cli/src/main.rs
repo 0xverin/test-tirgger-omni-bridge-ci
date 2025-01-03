@@ -36,6 +36,7 @@ pub enum Command {
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
+    env_logger::builder().init();
     let cli = Cli::parse();
 
     match &cli.command {

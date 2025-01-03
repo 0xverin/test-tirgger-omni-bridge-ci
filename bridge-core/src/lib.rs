@@ -17,6 +17,6 @@
 pub mod fetcher;
 pub mod key_store;
 pub mod listener;
+pub mod primitives;
 pub mod relay;
 pub mod sync_checkpoint_repository;
-pub mod primitives;

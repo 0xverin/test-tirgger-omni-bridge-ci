@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
-use alloy::primitives::{U256, Address, Bytes, FixedBytes};
-use std::str::FromStr;
 use subxt::utils::AccountId32;
 
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
 use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use crate::{
-    relay::{Relay, Relayer},
+    relay::Relay,
     sync_checkpoint_repository::{Checkpoint, CheckpointRepository},
 };
 
@@ -54,29 +53,30 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
 
 #[derive(Debug, Clone)]
 pub struct DepositRecord {
-    pub token_address: Address,                // Solidity "address" -> Alloy "Address"
-    pub destination_chain_id: u8,             // Solidity "uint8" -> Rust "u8"
-    pub resource_id: FixedBytes<32>,                // Solidity "bytes32" -> Fixed-size Rust array
+    pub token_address: Address,      // Solidity "address" -> Alloy "Address"
+    pub destination_chain_id: u8,    // Solidity "uint8" -> Rust "u8"
+    pub resource_id: FixedBytes<32>, // Solidity "bytes32" -> Fixed-size Rust array
     pub destination_recipient_address: Bytes, // Solidity "bytes" -> Rust Vec<u8>
-    pub depositer: Address,                   // Solidity "address" -> Alloy "Address"
+    pub depositer: Address,          // Solidity "address" -> Alloy "Address"
     pub amount: U256,
-    pub nonce: u64                         // Solidity "uint" (uint256) -> Alloy "U256"
+    pub nonce: u64, // Solidity "uint" (uint256) -> Alloy "U256"
 }
 
 impl DepositRecord {
-    // Consume the event 
-    pub fn create_transfer_fungible_arguments(self) -> (u128, [u8;32], AccountId32) {
+    // Consume the event
+    pub fn create_transfer_fungible_arguments(self) -> (u128, [u8; 32], AccountId32) {
         let amount: u128 = self.amount.try_into().unwrap();
-        let resource_id: [u8;32] = self.resource_id.clone().into();
-        let array: [u8; 32] = self.destination_recipient_address
+        let resource_id: [u8; 32] = self.resource_id.clone().into();
+        let array: [u8; 32] = self
+            .destination_recipient_address
             .as_ref()
-            .try_into().unwrap();
+            .try_into()
+            .unwrap();
         let account: AccountId32 = AccountId32(array);
 
         (amount, resource_id, account)
     }
 }
-
 
 /// Core component, used to listen to source chain and relay bridge request to destination chain.
 /// Requires specific implementations of:
@@ -190,14 +190,17 @@ impl<
             if last_finalized_block >= block_number_to_sync {
                 if let Ok(events) = self
                     .handle
-                    .block_on(self.fetcher.get_chain_events(block_number_to_sync))
+                    .block_on(self.fetcher.get_block_pay_in_events(block_number_to_sync))
                 {
                     for event in events {
                         let maybe_relayer = match self.relay {
                             Relay::Single(ref relay) => Some(relay),
                             Relay::Multi(ref relayers) => {
-                                // By default, For now we will not support multi
-                                None
+                                if let Some(event_source_id) = event.maybe_event_source {
+                                    relayers.get(&event_source_id)
+                                } else {
+                                    None
+                                }
                             }
                         };
                         if let Some(relayer) = maybe_relayer {
@@ -206,26 +209,34 @@ impl<
                                 .get()
                                 .expect("Could not read checkpoint")
                             {
-                                // For now I'm not seeing the checkpoint 
-                                // if checkpoint.lt(&event.nonce().clone().into()) {
+                                // For now I'm not seeing the checkpoint
+                                if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(e) = self.handle.block_on(relayer.relay(event.clone())) {
+                                    //todo: replace vec
+                                    if let Err(_) = self
+                                        .handle
+                                        .block_on(relayer.relay(event.amount, event.data))
+                                    {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
                                         continue 'main;
                                     }
-                                // } else {
+                                } else {
                                     log::debug!("Skipping event");
-                                // }
+                                }
                             } else {
-                                if let Err(e) = self.handle.block_on(relayer.relay(event.clone())) {
+                                //todo: replace vec
+                                if let Err(_) = self
+                                    .handle
+                                    .block_on(relayer.relay(event.amount, event.data))
+                                {
                                     log::info!("Could not relay");
                                     sleep(Duration::from_secs(1));
                                     continue 'main;
                                 }
                             }
                             self.checkpoint_repository
-                                .save(event.nonce().into())
+                                .save(event.id.into())
                                 .expect("Could not save checkpoint");
                         }
                     }

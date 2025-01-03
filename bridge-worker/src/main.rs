@@ -44,7 +44,7 @@ async fn main() -> Result<(), ()> {
         })
         .init();
 
-    fs::create_dir_all("data/").map_err(|e| {
+    fs::create_dir_all("data/").map_err(|_| {
         error!("Could not create data dir");
         ()
     })?;
@@ -60,7 +60,7 @@ async fn main() -> Result<(), ()> {
 }
 
 async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
-    let (sub_stop_sender, sub_stop_receiver) = oneshot::channel();
+    let (_sub_stop_sender, sub_stop_receiver) = oneshot::channel();
 
     let key_store = EthereumKeyStore::new("data/ethereum_relayer_key.bin".to_string());
 
@@ -101,7 +101,7 @@ fn sync_sepolia() -> Result<JoinHandle<()>, ()> {
 
     let relayer: SubstrateRelayer<CustomConfig> =
         SubstrateRelayer::new("ws://litentry-node:9944", key_store);
-    let (stop_sender, stop_receiver) = oneshot::channel();
+    let (_stop_sender, stop_receiver) = oneshot::channel();
     let mut eth_listener = create_listener(
         "sepolia",
         Handle::current(),

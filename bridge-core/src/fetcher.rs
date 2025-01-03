@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::listener::DepositRecord;
+use crate::listener::PayIn;
 use async_trait::async_trait;
-use crate::primitives::ChainEvents;
 
 /// Returns the last finalized block number
 #[async_trait]
@@ -30,8 +29,8 @@ pub trait LastFinalizedBlockNumFetcher {
 /// fetch events from all of them together.
 #[async_trait]
 pub trait BlockPayInEventsFetcher<Id: Clone, EventSourceId: Clone> {
-    async fn get_chain_events(
+    async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<ChainEvents>, ()>;
+    ) -> Result<Vec<PayIn<Id, EventSourceId>>, ()>;
 }

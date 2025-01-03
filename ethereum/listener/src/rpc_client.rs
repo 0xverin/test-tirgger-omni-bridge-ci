@@ -15,11 +15,9 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use alloy::network::Ethereum;
-use alloy::primitives::{Address, IntoLogData, address};
-use alloy::sol_types::SolEvent;
+use alloy::primitives::{Address, IntoLogData};
 use async_trait::async_trait;
 use log::error;
-use bridge_core::primitives::Deposit;
 
 use crate::primitives::{Log, LogId};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
@@ -44,11 +42,6 @@ pub trait EthereumRpcClient {
         addresses: Vec<Address>,
         event: &str,
     ) -> Result<Vec<Log>, ()>;
-    async fn get_deposit_record(
-        &self, 
-        destination_id: u8,
-        deposit_nonce: u64
-    ) -> Deposit;
 }
 
 pub struct EthersRpcClient {
@@ -103,25 +96,6 @@ impl EthereumRpcClient for EthersRpcClient {
             })
             .map_err(|_| ())
     }
-
-    async fn get_deposit_record(
-        &self, 
-        destination_id: u8,
-        deposit_nonce: u64
-    ) -> Deposit {
-       let contract = ERC20Handler::new(address!("e7f1725E7734CE288F8367e1Bb143E90bb3F0512"), self.client.clone());
-       let deposit_record = contract.getDepositRecord(deposit_nonce, destination_id).call().await.unwrap()._0;
-       Deposit {
-            token_address: deposit_record._tokenAddress, 
-            destination_chain_id: deposit_record._destinationChainID, 
-            resource_id: deposit_record._resourceID,
-            destination_recipient_address: deposit_record._destinationRecipientAddress, 
-            depositer: deposit_record._depositer,
-            amount: deposit_record._amount,
-            nonce: deposit_nonce
-       }
-    }
-
 }
 
 #[cfg(test)]
@@ -178,8 +152,8 @@ pub mod mocks {
         async fn get_block_logs(
             &self,
             block_number: u64,
-            addresses: Vec<Address>,
-            event: &str,
+            _addresses: Vec<Address>,
+            _event: &str,
         ) -> Result<Vec<Log>, ()> {
             self.block_logs
                 .get(&block_number)

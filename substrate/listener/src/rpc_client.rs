@@ -22,7 +22,6 @@ use subxt::backend::BlockRef;
 use subxt::config::Header;
 use subxt::events::{EventsClient, StaticEvent};
 use subxt::{Config, OnlineClient};
-use crate::litentry_rococo::chain_bridge::events::FungibleTransfer;
 
 pub struct BlockEvent<T> {
     pub id: EventId,
@@ -39,12 +38,12 @@ pub struct PayInEvent {}
 
 /// For fetching data from Substrate RPC node
 #[async_trait]
-pub trait SubstrateRpcClient{
+pub trait SubstrateRpcClient {
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()>;
-    async fn get_fungible_transfer_events(
+    async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<FungibleTransfer>, ()>;
+    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()>;
 }
 
 pub struct RpcClient<ChainConfig: Config, PayInEventType: StaticEvent> {
@@ -75,10 +74,10 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
             None => Err(()),
         }
     }
-    async fn get_fungible_transfer_events(
+    async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<FungibleTransfer>, ()> {
+    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
         match self
             .legacy
             .chain_get_block_hash(Some(block_num.into()))
@@ -92,11 +91,14 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
                     .await
                     .map_err(|_| ())?;
 
-                let fungible_events = events.find::<FungibleTransfer>();
+                let pay_in_events = events.find::<PayInEventType>();
 
-                let fungible_events: Vec<FungibleTransfer> = fungible_events.into_iter().map(|ev| ev.unwrap()).collect();
-                log::debug!("Found {:?} fungible events in block: {:?}", fungible_events.len(), block_num);
-                Ok(fungible_events)
+                Ok(pay_in_events
+                    .enumerate()
+                    .map(|(i, _event)| {
+                        BlockEvent::new(EventId::new(block_num, i as u64), PayInEvent {})
+                    })
+                    .collect())
             }
             None => Err(()),
         }
@@ -105,24 +107,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
 
 #[derive(Default)]
 pub struct MockedRpcClientBuilder {
-    block_num: Option<u64>,
-}
-
-impl MockedRpcClientBuilder {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn with_block_num(mut self, block_num: u64) -> Self {
-        self.block_num = Some(block_num);
-        self
-    }
-
-    pub fn build(self) -> MockedRpcClient {
-        MockedRpcClient {
-            block_num: self.block_num.unwrap_or_default(),
-        }
-    }
+    _block_num: Option<u64>,
 }
 
 pub struct MockedRpcClient {
@@ -135,10 +120,10 @@ impl SubstrateRpcClient for MockedRpcClient {
         Ok(self.block_num)
     }
 
-    async fn get_fungible_transfer_events(
+    async fn get_block_pay_in_events(
         &mut self,
-        block_num: u64,
-    ) -> Result<Vec<FungibleTransfer>, ()> {
+        _block_num: u64,
+    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
         Ok(vec![])
     }
 }

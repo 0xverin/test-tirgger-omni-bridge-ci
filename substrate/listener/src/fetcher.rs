@@ -16,9 +16,8 @@
 
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
-use bridge_core::listener::DepositRecord;
+use bridge_core::listener::PayIn;
 use log::error;
-use bridge_core::primitives::{ChainEvents, TransferFungible};
 
 use crate::rpc_client::SubstrateRpcClientFactory;
 use crate::{listener::PayInEventId, rpc_client::SubstrateRpcClient};
@@ -76,31 +75,22 @@ impl<
         RpcClientFactory: SubstrateRpcClientFactory<RpcClient> + Sync + Send,
     > BlockPayInEventsFetcher<PayInEventId, ()> for Fetcher<RpcClient, RpcClientFactory>
 {
-    async fn get_chain_events(
+    async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<ChainEvents>, ()> {
+    ) -> Result<Vec<PayIn<PayInEventId, ()>>, ()> {
         self.connect_if_needed().await;
 
-        log::debug!("Looking for chainBridge.transferFungible event in Block Number: {:?}", block_num);
         if let Some(ref mut client) = self.client {
-            let events = client
-                .get_fungible_transfer_events(block_num)
-                .await.unwrap(); 
-
-            log::debug!("Length of the events received: {:?}", events.len());
-
-            let transfer_fungible_events: Vec<ChainEvents> = events.iter().map(|ev| {
-                ChainEvents::SubstrateWithdrawEvent(TransferFungible::new(
-                    ev.0, 
-                    ev.1, 
-                    ev.2, 
-                    ev.3, 
-                    ev.4.clone()
-                ))
-            }).collect();
-            
-            Ok(transfer_fungible_events)
+            client
+                .get_block_pay_in_events(block_num)
+                .await
+                .map(|events| {
+                    events
+                        .into_iter()
+                        .map(|event| PayIn::new(event.id, None, 0, vec![]))
+                        .collect()
+                })
         } else {
             Ok(vec![])
         }

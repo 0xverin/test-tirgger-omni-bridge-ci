@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::fetcher::Fetcher;
 use alloy::primitives::Address;
@@ -52,7 +52,7 @@ pub fn create_listener(
     let fetcher: Fetcher<EthersRpcClient> = Fetcher::new(
         finalization_gap_blocks,
         client,
-        HashSet::from([Address::from_str("0x5FbDB2315678afecb367f032d93F642f64180aa3").unwrap()])
+        HashSet::from([Address::from_str("0x5FbDB2315678afecb367f032d93F642f64180aa3").unwrap()]),
     );
 
     let ethereum_listener: EthereumListener<EthersRpcClient, FileCheckpointRepository> =
