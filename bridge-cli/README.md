@@ -19,8 +19,8 @@ For bridging ethereum -> substrate
 
 1. Add substrate account 5C7C2Z5sWbytvHpuLTvzKunnnRwQxft1jiqrLD5rhucQ5S9X as Admin on PalletBridge using sudo call through polkadotjs
 2. Add substrate relayer `./bridge-cli substrate add-relayer 5DFW6oheaiW3XMDaPFi7RYLsKdPimAaY8Ajz2zA6S4STHG1D`
-3. Setup chainbridge contracts `./bridge-cli ethereum ethereum setup-bridge`
-4. Fund account with LIT tokens, swap them to HEI and execute chaindbridge deposit `./bridge-cli bridge 100 1cJNyZCPxpf1UPPt8ckHsiN8N77ykMK9kmamrFY2rE6d77F`
+3. Setup chainbridge contracts `./bridge-cli ethereum setup-bridge`
+4. Fund account with LIT tokens, swap them to HEI and execute chaindbridge deposit `./bridge-cli ethereum bridge 100 1cJNyZCPxpf1UPPt8ckHsiN8N77ykMK9kmamrFY2rE6d77F`
 5. You should see `PaidOut` event emitted on substrate chain
 
 # Bridging using CLI
