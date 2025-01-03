@@ -180,10 +180,8 @@ impl<
                                 .get()
                                 .expect("Could not read checkpoint")
                             {
-                                // For now I'm not seeing the checkpoint
                                 if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    //todo: replace vec
                                     if let Err(_) = self
                                         .handle
                                         .block_on(relayer.relay(event.amount, event.data))
@@ -196,7 +194,6 @@ impl<
                                     log::debug!("Skipping event");
                                 }
                             } else {
-                                //todo: replace vec
                                 if let Err(_) = self
                                     .handle
                                     .block_on(relayer.relay(event.amount, event.data))

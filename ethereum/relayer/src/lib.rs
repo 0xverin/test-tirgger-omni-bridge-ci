@@ -33,7 +33,6 @@ use log::{debug, error};
 
 pub mod key_store;
 
-// TODO: Update this bridge instance
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
