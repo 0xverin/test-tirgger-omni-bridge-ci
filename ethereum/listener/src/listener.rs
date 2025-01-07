@@ -40,6 +40,7 @@ pub mod tests {
 
     use alloy::dyn_abi::DynSolValue;
     use alloy::primitives::{keccak256, Address, Bytes, U256};
+    use alloy::sol_types::SolValue;
     use thread::sleep;
     use tokio::{
         runtime::Handle,
@@ -65,14 +66,19 @@ pub mod tests {
         let start_block = 0;
         let mut logs: HashMap<u64, Vec<Log>> = HashMap::new();
 
+        let event_data = U256::from(10).abi_encode();
+
         let block_1_logs: Vec<Log> = vec![Log {
             id: LogId::new(1, 1, 1),
             address: Address::from_str(source).unwrap(),
             topics: vec![keccak256(EVENT_TOPIC.as_bytes())],
             data: Bytes::from(
                 DynSolValue::Tuple(vec![
+                    DynSolValue::Uint(U256::from(0), 8),
+                    DynSolValue::Uint(U256::from(0), 256),
+                    DynSolValue::Address(Address::default()),
+                    DynSolValue::Bytes(event_data.to_vec()),
                     DynSolValue::Uint(U256::from(10), 256),
-                    DynSolValue::Bytes(vec![]),
                 ])
                 .abi_encode_params(),
             ),
@@ -110,7 +116,7 @@ pub mod tests {
         )
         .unwrap();
 
-        let handle = thread::spawn(move || listener.sync(start_block));
+        let _handle = thread::spawn(move || listener.sync(start_block));
 
         assert_relay_count(&mut receiver, 1).await;
         stop_sender.send(()).unwrap();
@@ -126,14 +132,19 @@ pub mod tests {
         let start_block = 0;
         let mut logs: HashMap<u64, Vec<Log>> = HashMap::new();
 
+        let event_data = U256::from(10).abi_encode();
+
         let block_1_logs: Vec<Log> = vec![Log {
             id: LogId::new(1, 1, 1),
             address: Address::from_str(source).unwrap(),
             topics: vec![keccak256(EVENT_TOPIC.as_bytes())],
             data: Bytes::from(
                 DynSolValue::Tuple(vec![
+                    DynSolValue::Uint(U256::from(0), 8),
+                    DynSolValue::Uint(U256::from(0), 256),
+                    DynSolValue::Address(Address::default()),
+                    DynSolValue::Bytes(event_data.to_vec()),
                     DynSolValue::Uint(U256::from(10), 256),
-                    DynSolValue::Bytes(vec![]),
                 ])
                 .abi_encode_params(),
             ),
@@ -146,8 +157,11 @@ pub mod tests {
                 topics: vec![keccak256(EVENT_TOPIC.as_bytes())],
                 data: Bytes::from(
                     DynSolValue::Tuple(vec![
+                        DynSolValue::Uint(U256::from(0), 8),
+                        DynSolValue::Uint(U256::from(0), 256),
+                        DynSolValue::Address(Address::default()),
+                        DynSolValue::Bytes(event_data.to_vec()),
                         DynSolValue::Uint(U256::from(10), 256),
-                        DynSolValue::Bytes(vec![]),
                     ])
                     .abi_encode_params(),
                 ),
@@ -158,8 +172,11 @@ pub mod tests {
                 topics: vec![keccak256(EVENT_TOPIC.as_bytes())],
                 data: Bytes::from(
                     DynSolValue::Tuple(vec![
+                        DynSolValue::Uint(U256::from(0), 8),
+                        DynSolValue::Uint(U256::from(0), 256),
+                        DynSolValue::Address(Address::default()),
+                        DynSolValue::Bytes(event_data.to_vec()),
                         DynSolValue::Uint(U256::from(10), 256),
-                        DynSolValue::Bytes(vec![]),
                     ])
                     .abi_encode_params(),
                 ),
@@ -200,7 +217,7 @@ pub mod tests {
         )
         .unwrap();
 
-        let handle = thread::spawn(move || listener.sync(start_block));
+        let _handle = thread::spawn(move || listener.sync(start_block));
 
         assert_relay_count(&mut receiver, 1).await;
 
@@ -210,7 +227,7 @@ pub mod tests {
     async fn assert_relay_count(receiver: &mut UnboundedReceiver<()>, count: u64) {
         // let's give some time listener to process blocks
         sleep(Duration::from_millis(100));
-        for i in 0..count {
+        for _i in 0..count {
             log::info!("Waiting for event");
             assert!(receiver.recv().await.is_some());
             log::info!("Got event");

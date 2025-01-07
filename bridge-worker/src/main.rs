@@ -44,7 +44,7 @@ async fn main() -> Result<(), ()> {
         })
         .init();
 
-    fs::create_dir_all("data/").map_err(|e| {
+    fs::create_dir_all("data/").map_err(|_| {
         error!("Could not create data dir");
         ()
     })?;
@@ -60,7 +60,7 @@ async fn main() -> Result<(), ()> {
 }
 
 async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
-    let (sub_stop_sender, sub_stop_receiver) = oneshot::channel();
+    let (_sub_stop_sender, sub_stop_receiver) = oneshot::channel();
 
     let key_store = EthereumKeyStore::new("data/ethereum_relayer_key.bin".to_string());
 
@@ -78,7 +78,7 @@ async fn sync_litentry_rococo() -> Result<JoinHandle<()>, ()> {
 
     let mut substrate_listener = substrate_listener::create_listener::<
         CustomConfig,
-        substrate_listener::litentry_rococo::pallet_bridge::events::PaidIn,
+        substrate_listener::litentry_rococo::chain_bridge::events::FungibleTransfer,
     >(
         "litenty_rococo",
         Handle::current(),
@@ -101,17 +101,12 @@ fn sync_sepolia() -> Result<JoinHandle<()>, ()> {
 
     let relayer: SubstrateRelayer<CustomConfig> =
         SubstrateRelayer::new("ws://litentry-node:9944", key_store);
-    let (stop_sender, stop_receiver) = oneshot::channel();
+    let (_stop_sender, stop_receiver) = oneshot::channel();
     let mut eth_listener = create_listener(
         "sepolia",
         Handle::current(),
         "http://ethereum-node:8545",
-        // "https://sepolia.infura.io/v3/26255715664b4092add78bac6d995719",
-        vec![(
-            // address of bridge smart contract
-            "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-            Box::new(relayer),
-        )],
+        Box::new(relayer),
         finalization_gap_blocks,
         stop_receiver,
     )?;

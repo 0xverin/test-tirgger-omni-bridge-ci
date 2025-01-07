@@ -95,7 +95,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
 
                 Ok(pay_in_events
                     .enumerate()
-                    .map(|(i, event)| {
+                    .map(|(i, _event)| {
                         BlockEvent::new(EventId::new(block_num, i as u64), PayInEvent {})
                     })
                     .collect())
@@ -107,24 +107,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
 
 #[derive(Default)]
 pub struct MockedRpcClientBuilder {
-    block_num: Option<u64>,
-}
-
-impl MockedRpcClientBuilder {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn with_block_num(mut self, block_num: u64) -> Self {
-        self.block_num = Some(block_num);
-        self
-    }
-
-    pub fn build(self) -> MockedRpcClient {
-        MockedRpcClient {
-            block_num: self.block_num.unwrap_or_default(),
-        }
-    }
+    _block_num: Option<u64>,
 }
 
 pub struct MockedRpcClient {
@@ -139,7 +122,7 @@ impl SubstrateRpcClient for MockedRpcClient {
 
     async fn get_block_pay_in_events(
         &mut self,
-        block_num: u64,
+        _block_num: u64,
     ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
         Ok(vec![])
     }

@@ -10,3 +10,12 @@
 [submodule "ethereum/bridge-contracts/lib/openzeppelin-contracts-upgradeable"]
 	path = ethereum/bridge-contracts/lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+[submodule "ethereum/chainbridge-contracts/lib/openzeppelin-contracts"]
+	path = ethereum/chainbridge-contracts/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "ethereum/chainbridge-contracts/lib/forge-std"]
+	path = ethereum/chainbridge-contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "artifacts/ethereum/HEI-token"]
+	path = artifacts/ethereum/HEI-token
+	url = git@github.com:litentry/HEI-token.git

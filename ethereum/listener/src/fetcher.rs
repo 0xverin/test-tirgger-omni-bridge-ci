@@ -19,21 +19,28 @@
 
 use crate::listener::{EventSourceId, PayInEventId};
 use crate::rpc_client::EthereumRpcClient;
-use alloy::primitives::{keccak256, Address, B256};
+use alloy::primitives::{keccak256, Address, B256, U256};
 use alloy::sol;
-use alloy::sol_types::SolEvent;
+use alloy::sol_types::{SolEvent, SolValue};
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use bridge_core::listener::PayIn;
 use std::collections::HashSet;
 
-pub static EVENT_TOPIC: &str = "PaidIn(uint256,bytes)";
+pub static EVENT_TOPIC: &str = "Deposit(uint8,bytes32,uint64,address,bytes,bytes)";
 
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
-    Bridge,
-    "../bridge-contracts/out/Bridge.sol/Bridge.json"
+    ChainBridge,
+    "../chainbridge-contracts/out/Bridge.sol/Bridge.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    ERC20Handler,
+    "../chainbridge-contracts/out/ERC20Handler.sol/ERC20Handler.json"
 );
 
 /// Used for fetching data from ethereum based chains required by the `Listener`
@@ -79,23 +86,42 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                 EVENT_TOPIC,
             )
             .await?;
-        let logs: Vec<PayIn<PayInEventId, EventSourceId>> = block_logs
+
+        log::debug!("Checking log details for block number: {:?}", block_num);
+        log::debug!(
+            "Checking log details for contract: {:?}",
+            self.event_sources
+        );
+        log::debug!("Checking log details for topic: {:?}", self.event_topic);
+        log::debug!("Size of the logs received via RPC: {:?}", block_logs.len());
+        log::debug!("Logs in the buffer: {:?}", block_logs);
+
+        let deposit_events: Vec<_> = block_logs
             .into_iter()
             .filter(|log| {
                 self.event_sources.contains(&log.address) && log.topics.contains(&self.event_topic)
             })
             .map(|log| {
-                let event = Bridge::PaidIn::abi_decode_data(&log.data, false).unwrap();
-                let amount = event.0.to();
-                let data = event.1.to_vec();
-                // 256 bits to 128 bits conversion - we might be losing some important bits here ;/
-                PayIn::new(log.id, Some(log.address), amount, data)
+                let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
+                log::debug!("Got contract events: {:?}", event);
+                let nonce = event.2;
+                let data = event.3;
+
+                let amount_bytes = &data[0..32];
+                let amount: U256 = U256::abi_decode(amount_bytes, false).unwrap();
+
+                PayIn::new(
+                    log.id,
+                    Some(log.address),
+                    amount.try_into().unwrap(),
+                    nonce,
+                    data.into(),
+                )
             })
             .collect();
-        if !logs.is_empty() {
-            log::info!("Got contract events: {:?}", logs);
-        }
-        Ok(logs)
+
+        log::info!("Found {:?} Deposits on Ethereum", deposit_events.len());
+        Ok(deposit_events)
     }
 }
 
@@ -108,6 +134,7 @@ mod test {
     use crate::{primitives::Log, rpc_client::mocks::MockedRpcClientBuilder};
     use alloy::dyn_abi::DynSolValue;
     use alloy::primitives::{keccak256, Address, Bytes, U160, U256};
+    use alloy::sol_types::SolValue;
     use bridge_core::fetcher::BlockPayInEventsFetcher;
     use bridge_core::listener::PayIn;
     use std::collections::{HashMap, HashSet};
@@ -119,14 +146,19 @@ mod test {
         let mut pay_in_events: HashMap<u64, Vec<EthereumPayInEvent>> = HashMap::new();
         let mut logs: HashMap<u64, Vec<Log>> = HashMap::new();
 
+        let event_data = U256::from(10).abi_encode();
+
         let block_1_logs: Vec<Log> = vec![Log {
             id: LogId::new(1, 1, 1),
             address: source,
             topics: vec![keccak256(EVENT_TOPIC.as_bytes())],
             data: Bytes::from(
                 DynSolValue::Tuple(vec![
+                    DynSolValue::Uint(U256::from(0), 8),
+                    DynSolValue::Uint(U256::from(0), 256),
+                    DynSolValue::Uint(U256::from(1), 64),
+                    DynSolValue::Bytes(event_data.to_vec()),
                     DynSolValue::Uint(U256::from(10), 256),
-                    DynSolValue::Bytes(vec![]),
                 ])
                 .abi_encode_params(),
             ),
@@ -140,7 +172,8 @@ mod test {
             PayInEventId::new(1, 1, 1),
             Some(source),
             10,
-            vec![],
+            1,
+            event_data,
         )];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
 

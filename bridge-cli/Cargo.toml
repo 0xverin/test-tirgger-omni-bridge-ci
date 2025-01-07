@@ -8,3 +8,4 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 clap = { workspace = true, features = ["derive"] }
 ethereum-cli = { path = "../ethereum/cli" }
 substrate-cli = { path = "../substrate/cli" }
+env_logger = "0.11.6"

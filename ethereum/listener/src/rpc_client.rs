@@ -16,13 +16,21 @@
 
 use alloy::network::Ethereum;
 use alloy::primitives::{Address, IntoLogData};
-use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use log::error;
 
 use crate::primitives::{Log, LogId};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::rpc::types::Filter;
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    ERC20Handler,
+    "../chainbridge-contracts/out/ERC20Handler.sol/ERC20Handler.json"
+);
+
+use alloy::sol;
 
 /// For fetching data from Ethereum RPC node
 #[async_trait]
@@ -57,13 +65,14 @@ impl EthereumRpcClient for EthersRpcClient {
         })
     }
 
+    // TODO: Are there too many unwraps?
     async fn get_block_logs(
         &self,
         block_number: u64,
         addresses: Vec<Address>,
         event: &str,
     ) -> Result<Vec<Log>, ()> {
-        let filter = Filter::new()
+        let filter: Filter = Filter::new()
             .from_block(block_number)
             .to_block(block_number)
             .address(addresses)
@@ -143,8 +152,8 @@ pub mod mocks {
         async fn get_block_logs(
             &self,
             block_number: u64,
-            addresses: Vec<Address>,
-            event: &str,
+            _addresses: Vec<Address>,
+            _event: &str,
         ) -> Result<Vec<Log>, ()> {
             self.block_logs
                 .get(&block_number)

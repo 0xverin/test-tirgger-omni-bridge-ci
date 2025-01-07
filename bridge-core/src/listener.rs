@@ -20,7 +20,7 @@ use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
 use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use crate::{
-    relay::{Relay, Relayer},
+    relay::Relay,
     sync_checkpoint_repository::{Checkpoint, CheckpointRepository},
 };
 
@@ -30,6 +30,7 @@ pub struct PayIn<Id: Clone, EventSourceId: Clone> {
     id: Id,
     maybe_event_source: Option<EventSourceId>,
     amount: u128,
+    nonce: u64,
     data: Vec<u8>,
 }
 
@@ -38,12 +39,14 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
         id: Id,
         maybe_event_source: Option<EventSourceId>,
         amount: u128,
+        nonce: u64,
         data: Vec<u8>,
     ) -> Self {
         Self {
             id,
             maybe_event_source,
             amount,
+            nonce,
             data,
         }
     }
@@ -182,21 +185,26 @@ impl<
                             {
                                 if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(e) = self.handle.block_on(relayer.relay(vec![])) {
+                                    if let Err(_) = self.handle.block_on(relayer.relay(
+                                        event.amount,
+                                        event.nonce,
+                                        event.data,
+                                    )) {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
-                                        // it will try again in next loop
                                         continue 'main;
                                     }
                                 } else {
                                     log::debug!("Skipping event");
                                 }
                             } else {
-                                log::info!("Relaying");
-                                if let Err(e) = self.handle.block_on(relayer.relay(vec![])) {
+                                if let Err(_) = self.handle.block_on(relayer.relay(
+                                    event.amount,
+                                    event.nonce,
+                                    event.data,
+                                )) {
                                     log::info!("Could not relay");
                                     sleep(Duration::from_secs(1));
-                                    // it will try again in next loop
                                     continue 'main;
                                 }
                             }
