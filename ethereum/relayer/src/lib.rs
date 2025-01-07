@@ -45,8 +45,8 @@ sol!(
 
 #[derive(Deserialize)]
 pub struct RelayerConfig {
-    pub rpc_url: String,
-    pub bridge_address: String,
+    pub node_rpc_url: String,
+    pub bridge_contract_address: String,
 }
 
 pub fn create_from_config(config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
@@ -60,8 +60,8 @@ pub fn create_from_config(config: &BridgeConfig) -> HashMap<String, Box<dyn Rela
             EthereumKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
         let relayer: EthereumRelayer = EthereumRelayer::new(
-            &substrate_relayer_config.rpc_url,
-            &substrate_relayer_config.bridge_address,
+            &substrate_relayer_config.node_rpc_url,
+            &substrate_relayer_config.bridge_contract_address,
             key_store,
         )
         .unwrap();

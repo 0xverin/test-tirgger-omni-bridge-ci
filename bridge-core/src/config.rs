@@ -60,36 +60,65 @@ impl Relayer {
     }
 }
 
-// #[cfg(test)]
-// pub mod tests {
-//     use std::fs;
-//
-//     #[test]
-//     pub fn deserialize_sample_config() {
-//         let config = fs::read("../artifacts/bridge_config.json").unwrap();
-//         let bridge_worker_config: Config = serde_json::from_slice(&config).unwrap();
-//
-//         assert_eq!(bridge_worker_config.listeners.len(), 2);
-//         assert_eq!(bridge_worker_config.relayers.len(), 2);
-//
-//         assert_eq!(bridge_worker_config.listeners[0].id, "sepolia");
-//         assert_eq!(bridge_worker_config.listeners[0].relayers[0], "rococo");
-//         assert_eq!(bridge_worker_config.listeners[0].listener_type, "ethereum");
-//
-//         let sepolia_config: ethereum_listener::listener::ListenerConfig =
-//             bridge_worker_config.get_listener_config(0);
-//
-//         assert_eq!(bridge_worker_config.listeners[1].id, "rococo");
-//         assert_eq!(bridge_worker_config.listeners[1].relayers[0], "sepolia");
-//         assert_eq!(bridge_worker_config.listeners[1].listener_type, "substrate");
-//
-//         let rococo_config: substrate_listener::listener::ListenerConfig =
-//             bridge_worker_config.get_listener_config(1);
-//
-//         assert_eq!(bridge_worker_config.relayers[0].id, "sepolia");
-//         assert_eq!(bridge_worker_config.relayers[0].relayer_type, "ethereum");
-//
-//         assert_eq!(bridge_worker_config.relayers[1].id, "rococo");
-//         assert_eq!(bridge_worker_config.relayers[1].relayer_type, "substrate");
-//     }
-// }
+#[cfg(test)]
+pub mod tests {
+    use crate::config::BridgeConfig;
+    use std::fs;
+
+    #[test]
+    pub fn deserialize_sample_config() {
+        let config = fs::read("../artifacts/bridge_config.json").unwrap();
+        let bridge_worker_config: BridgeConfig = serde_json::from_slice(&config).unwrap();
+
+        assert_eq!(bridge_worker_config.listeners.len(), 2);
+        assert_eq!(bridge_worker_config.relayers.len(), 2);
+
+        assert_eq!(bridge_worker_config.listeners[0].id, "sepolia");
+        assert_eq!(bridge_worker_config.listeners[0].relayers[0], "rococo");
+        assert_eq!(bridge_worker_config.listeners[0].listener_type, "ethereum");
+
+        let sepolia_config: ethereum_listener::listener::ListenerConfig =
+            bridge_worker_config.get_listener_config(0);
+
+        assert_eq!(sepolia_config.node_rpc_url, "http://ethereum-node:8545");
+        assert_eq!(
+            sepolia_config.bridge_contract_address,
+            "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        );
+
+        assert_eq!(bridge_worker_config.listeners[1].id, "rococo");
+        assert_eq!(bridge_worker_config.listeners[1].relayers[0], "sepolia");
+        assert_eq!(bridge_worker_config.listeners[1].listener_type, "substrate");
+
+        let rococo_config: substrate_listener::listener::ListenerConfig =
+            bridge_worker_config.get_listener_config(1);
+
+        assert_eq!(rococo_config.ws_rpc_endpoint, "ws://litentry-node:9944");
+
+        assert_eq!(bridge_worker_config.relayers[0].id, "sepolia");
+        assert_eq!(bridge_worker_config.relayers[0].relayer_type, "ethereum");
+
+        let sepolia_relayer_config: ethereum_relayer::RelayerConfig =
+            bridge_worker_config.relayers[0].to_specific_config();
+
+        assert_eq!(
+            sepolia_relayer_config.node_rpc_url,
+            "http://ethereum-node:8545"
+        );
+        assert_eq!(
+            sepolia_relayer_config.bridge_contract_address,
+            "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        );
+
+        assert_eq!(bridge_worker_config.relayers[1].id, "rococo");
+        assert_eq!(bridge_worker_config.relayers[1].relayer_type, "substrate");
+
+        let rococo_relayer_config: substrate_relayer::RelayerConfig =
+            bridge_worker_config.relayers[1].to_specific_config();
+
+        assert_eq!(
+            rococo_relayer_config.ws_rpc_endpoint,
+            "ws://litentry-node:9944"
+        );
+    }
+}

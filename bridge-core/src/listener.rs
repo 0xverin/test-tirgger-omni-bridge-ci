@@ -224,11 +224,15 @@ impl<
                             {
                                 if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    if self.handle.block_on(relayer.relay(
-                                        event.amount,
-                                        event.nonce,
-                                        event.data,
-                                    )).is_err() {
+                                    if self
+                                        .handle
+                                        .block_on(relayer.relay(
+                                            event.amount,
+                                            event.nonce,
+                                            event.data,
+                                        ))
+                                        .is_err()
+                                    {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
                                         continue 'main;
@@ -236,11 +240,11 @@ impl<
                                 } else {
                                     log::debug!("Skipping event");
                                 }
-                            } else if self.handle.block_on(relayer.relay(
-                                event.amount,
-                                event.nonce,
-                                event.data,
-                            )).is_err() {
+                            } else if self
+                                .handle
+                                .block_on(relayer.relay(event.amount, event.nonce, event.data))
+                                .is_err()
+                            {
                                 log::info!("Could not relay");
                                 sleep(Duration::from_secs(1));
                                 continue 'main;

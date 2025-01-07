@@ -1120,10 +1120,14 @@ name = "bridge-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "ethereum-listener",
+ "ethereum-relayer",
  "log",
  "parity-scale-codec",
  "serde",
  "serde_json",
+ "substrate-listener",
+ "substrate-relayer",
  "tokio",
 ]
 

@@ -36,7 +36,7 @@ pub type CONF = PolkadotConfig;
 
 #[derive(Deserialize)]
 pub struct RelayerConfig {
-    pub node_rpc_url: String,
+    pub ws_rpc_endpoint: String,
 }
 
 /// Relays bridge request to substrate node's runtime pallet.
@@ -57,7 +57,7 @@ pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, B
             SubstrateKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
         let relayer: SubstrateRelayer<T> =
-            SubstrateRelayer::new(&substrate_relayer_config.node_rpc_url, key_store);
+            SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
         relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
     }
 
