@@ -1,0 +1,42 @@
+{
+  "listeners": [
+    {
+      "listener_type": "ethereum",
+      "id": "sepolia",
+      "relayers": [
+        "rococo"
+      ],
+      "config": {
+          "node_rpc_url": "http://ethereum-node:8545",
+          "bridge_contract_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      }
+    },
+    {
+      "listener_type": "substrate",
+      "id": "rococo",
+      "relayers": [
+        "sepolia"
+      ],
+      "config": {
+          "ws_rpc_endpoint": "ws://litentry-node:9944"
+      }
+    }
+  ],
+  "relayers": [
+    {
+      "relayer_type": "ethereum",
+      "id": "sepolia",
+      "config": {
+          "rpc_url": "http://ethereum-node:8545",
+          "bridge_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      }
+    },
+    {
+      "relayer_type": "substrate",
+      "id": "rococo",
+      "config": {
+        "node_rpc_url": "ws://litentry-node:9944"
+      }
+    }
+  ]
+}

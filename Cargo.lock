@@ -1122,6 +1122,8 @@ dependencies = [
  "async-trait",
  "log",
  "parity-scale-codec",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -1129,11 +1131,14 @@ dependencies = [
 name = "bridge-worker"
 version = "0.1.0"
 dependencies = [
+ "bridge-core",
  "env_logger",
  "ethereum-listener",
  "ethereum-relayer",
  "hex",
  "log",
+ "serde",
+ "serde_json",
  "substrate-listener",
  "substrate-relayer",
  "tokio",
@@ -1751,6 +1756,7 @@ dependencies = [
  "env_logger",
  "log",
  "parity-scale-codec",
+ "serde",
  "tokio",
 ]
 
@@ -1762,6 +1768,7 @@ dependencies = [
  "async-trait",
  "bridge-core",
  "log",
+ "serde",
 ]
 
 [[package]]
@@ -4592,6 +4599,7 @@ dependencies = [
  "log",
  "parity-scale-codec",
  "scale-encode 0.7.1",
+ "serde",
  "subxt",
  "tokio",
 ]
@@ -4603,6 +4611,7 @@ dependencies = [
  "async-trait",
  "bridge-core",
  "log",
+ "serde",
  "subxt",
  "subxt-signer",
 ]

@@ -29,6 +29,7 @@ pub trait Checkpoint {
 }
 
 /// Used for saving and reading `Checkpoint`
+#[allow(clippy::result_unit_err)]
 pub trait CheckpointRepository<Checkpoint> {
     fn get(&self) -> Result<Option<Checkpoint>, ()>;
     fn save(&mut self, checkpoint: Checkpoint) -> Result<(), ()>;

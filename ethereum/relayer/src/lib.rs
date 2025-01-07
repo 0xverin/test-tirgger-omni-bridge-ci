@@ -27,9 +27,12 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::sol;
 use alloy::transports::http::{Client, Http};
 use async_trait::async_trait;
+use bridge_core::config::BridgeConfig;
 use bridge_core::key_store::KeyStore;
 use bridge_core::relay::Relayer;
 use log::{debug, error};
+use serde::Deserialize;
+use std::collections::HashMap;
 
 pub mod key_store;
 
@@ -40,7 +43,36 @@ sol!(
     "../../ethereum/chainbridge-contracts/out/Bridge.sol/Bridge.json"
 );
 
+#[derive(Deserialize)]
+pub struct RelayerConfig {
+    pub rpc_url: String,
+    pub bridge_address: String,
+}
+
+pub fn create_from_config(config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
+    let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
+    for relayer_config in config
+        .relayers
+        .iter()
+        .filter(|r| r.relayer_type == "ethereum")
+    {
+        let key_store =
+            EthereumKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
+        let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
+        let relayer: EthereumRelayer = EthereumRelayer::new(
+            &substrate_relayer_config.rpc_url,
+            &substrate_relayer_config.bridge_address,
+            key_store,
+        )
+        .unwrap();
+        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+    }
+    relayers
+}
+
+
 /// Relays bridge request to smart contracts deployed on ethereum based network.
+#[allow(clippy::type_complexity)]
 pub struct EthereumRelayer {
     bridge_instance: BridgeInstance<
         Http<Client>,
@@ -57,6 +89,7 @@ pub struct EthereumRelayer {
 }
 
 // TODO: We need to configure gas options
+#[allow(clippy::result_unit_err)]
 impl EthereumRelayer {
     pub fn new(
         rpc_url: &str,
