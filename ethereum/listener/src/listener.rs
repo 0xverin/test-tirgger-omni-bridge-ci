@@ -18,10 +18,17 @@ use crate::fetcher::Fetcher;
 use crate::primitives::{LogId, SyncCheckpoint};
 use alloy::primitives::Address;
 use bridge_core::listener::{Listener, PayIn};
+use serde::Deserialize;
 
 pub type PayInEventId = LogId;
 pub type EventSourceId = Address;
 pub type EthereumPayInEvent = PayIn<PayInEventId, EventSourceId>;
+
+#[derive(Deserialize)]
+pub struct ListenerConfig {
+    pub node_rpc_url: String,
+    pub bridge_contract_address: String,
+}
 
 pub type EthereumListener<RpcClient, CheckpointRepository> =
     Listener<EventSourceId, Fetcher<RpcClient>, SyncCheckpoint, CheckpointRepository, PayInEventId>;

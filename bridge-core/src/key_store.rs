@@ -20,6 +20,7 @@ use std::fs::File;
 use std::io::Write;
 
 /// Used for persisting Relayer's keys.
+#[allow(clippy::result_unit_err)]
 pub trait KeyStore<K> {
     fn generate_key() -> Result<K, ()>;
     fn serialize(k: &K) -> Result<Vec<u8>, ()>;

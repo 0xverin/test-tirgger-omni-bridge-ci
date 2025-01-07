@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
-
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
+use crate::config::BridgeConfig;
 use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use crate::{
     relay::Relay,
@@ -52,6 +54,42 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
     }
 }
 
+pub struct ListenerContext<T> {
+    pub id: String,
+    pub config: T,
+    pub relayers: Vec<Box<dyn crate::relay::Relayer>>,
+}
+
+pub fn prepare_listener_context<T: DeserializeOwned>(
+    config: &BridgeConfig,
+    listener_type: &str,
+    relayers: &mut HashMap<String, HashMap<String, Box<dyn crate::relay::Relayer>>>,
+) -> Vec<ListenerContext<T>> {
+    let mut components = vec![];
+    for listener_config in config
+        .listeners
+        .iter()
+        .filter(|l| l.listener_type == listener_type)
+    {
+        let ethereum_listener_config: T = listener_config.to_specific_config();
+        let mut listener_relayers: Vec<Box<dyn crate::relay::Relayer>> = vec![];
+
+        for relayer_id in listener_config.relayers.iter() {
+            for relayers in relayers.values_mut() {
+                if let Some(relayer) = relayers.remove(relayer_id) {
+                    listener_relayers.push(relayer)
+                }
+            }
+        }
+        components.push(ListenerContext {
+            id: listener_config.id.clone(),
+            config: ethereum_listener_config,
+            relayers: listener_relayers,
+        });
+    }
+    components
+}
+
 /// Core component, used to listen to source chain and relay bridge request to destination chain.
 /// Requires specific implementations of:
 /// `Fetcher` - used to fetch data from source chain
@@ -67,6 +105,7 @@ pub struct Listener<EventSourceId, Fetcher, Checkpoint, CheckpointRepository, Pa
     _phantom: PhantomData<(Checkpoint, PayInEventId)>,
 }
 
+#[allow(clippy::result_unit_err)]
 impl<
         EventSourceId: Hash + Eq + Clone,
         PayInEventId: Into<CheckpointT> + Clone,
@@ -185,11 +224,15 @@ impl<
                             {
                                 if checkpoint.lt(&event.id.clone().into()) {
                                     log::info!("Relaying");
-                                    if let Err(_) = self.handle.block_on(relayer.relay(
-                                        event.amount,
-                                        event.nonce,
-                                        event.data,
-                                    )) {
+                                    if self
+                                        .handle
+                                        .block_on(relayer.relay(
+                                            event.amount,
+                                            event.nonce,
+                                            event.data,
+                                        ))
+                                        .is_err()
+                                    {
                                         log::info!("Could not relay");
                                         sleep(Duration::from_secs(1));
                                         continue 'main;
@@ -197,21 +240,19 @@ impl<
                                 } else {
                                     log::debug!("Skipping event");
                                 }
-                            } else {
-                                if let Err(_) = self.handle.block_on(relayer.relay(
-                                    event.amount,
-                                    event.nonce,
-                                    event.data,
-                                )) {
-                                    log::info!("Could not relay");
-                                    sleep(Duration::from_secs(1));
-                                    continue 'main;
-                                }
+                            } else if self
+                                .handle
+                                .block_on(relayer.relay(event.amount, event.nonce, event.data))
+                                .is_err()
+                            {
+                                log::info!("Could not relay");
+                                sleep(Duration::from_secs(1));
+                                continue 'main;
                             }
-                            self.checkpoint_repository
-                                .save(event.id.into())
-                                .expect("Could not save checkpoint");
                         }
+                        self.checkpoint_repository
+                            .save(event.id.into())
+                            .expect("Could not save checkpoint");
                     }
                     // we processed block completely so store new checkpoint
                     self.checkpoint_repository

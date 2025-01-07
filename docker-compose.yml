@@ -1,11 +1,14 @@
 services: 
   tee-bridge:
     image: bridge:latest
+    command: "./artifacts/bridge_config.json"
     environment:
       - RUST_LOG=debug
     depends_on:
       - ethereum-node
       - litentry-node
+    volumes:
+      - ./artifacts/:/artifacts
   ethereum-node:
     image: ghcr.io/foundry-rs/foundry
     command:

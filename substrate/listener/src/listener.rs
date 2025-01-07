@@ -15,6 +15,7 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use bridge_core::listener::Listener;
+use serde::Deserialize;
 
 use crate::fetcher::Fetcher;
 use crate::primitives::EventId;
@@ -29,3 +30,8 @@ pub type SubstrateListener<RpcClient, RpcClientFactory, CheckpointRepository> = 
     CheckpointRepository,
     PayInEventId,
 >;
+
+#[derive(Deserialize)]
+pub struct ListenerConfig {
+    pub ws_rpc_endpoint: String,
+}

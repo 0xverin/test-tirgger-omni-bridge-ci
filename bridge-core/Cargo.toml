@@ -8,3 +8,11 @@ tokio = {  workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }
 parity-scale-codec = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde = { version = "1.0.217", features = ["derive"] }
+
+[dev-dependencies]
+ethereum-listener = { path = "../ethereum/listener" }
+ethereum-relayer = { path = "../ethereum/relayer" }
+substrate-listener = { path = "../substrate/listener" }
+substrate-relayer = { path = "../substrate/relayer" }

@@ -9,3 +9,4 @@ async-trait = { workspace = true }
 subxt = "0.37.0"
 subxt-signer = { version = "0.37.0", features = ["subxt"]}
 log = { workspace = true }
+serde = { workspace = true }

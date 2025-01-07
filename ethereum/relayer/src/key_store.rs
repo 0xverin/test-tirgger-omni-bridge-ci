@@ -46,7 +46,7 @@ impl KeyStore<SigningKey> for EthereumKeyStore {
     }
 
     fn deserialize(sealed: Vec<u8>) -> Result<SigningKey, ()> {
-        Ok(SigningKey::from_slice(&sealed).map_err(|_| ())?)
+        SigningKey::from_slice(&sealed).map_err(|_| ())
     }
 
     fn path(&self) -> String {

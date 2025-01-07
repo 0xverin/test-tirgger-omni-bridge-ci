@@ -16,11 +16,15 @@
 
 use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
+use bridge_core::config::BridgeConfig;
 use bridge_core::relay::Relayer;
 use log::debug;
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use subxt::utils::AccountId32;
 use subxt::{Config, PolkadotConfig};
+use subxt_signer::bip39::serde;
 
 pub mod key_store;
 
@@ -30,11 +34,34 @@ pub mod litentry_rococo {}
 
 pub type CONF = PolkadotConfig;
 
+#[derive(Deserialize)]
+pub struct RelayerConfig {
+    pub ws_rpc_endpoint: String,
+}
+
 /// Relays bridge request to substrate node's runtime pallet.
 pub struct SubstrateRelayer<T: Config> {
     _rpc_url: String,
     _key_store: SubstrateKeyStore,
     _phantom: PhantomData<T>,
+}
+
+pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
+    let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
+    for relayer_config in config
+        .relayers
+        .iter()
+        .filter(|r| r.relayer_type == "substrate")
+    {
+        let key_store =
+            SubstrateKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
+        let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
+        let relayer: SubstrateRelayer<T> =
+            SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
+        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+    }
+
+    relayers
 }
 
 impl<T: Config> SubstrateRelayer<T> {

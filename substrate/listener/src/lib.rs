@@ -15,12 +15,12 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 mod fetcher;
-mod listener;
+pub mod listener;
 mod primitives;
 mod rpc_client;
 
 use crate::fetcher::Fetcher;
-use crate::listener::SubstrateListener;
+use crate::listener::{ListenerConfig, SubstrateListener};
 use crate::rpc_client::{RpcClient, RpcClientFactory};
 use bridge_core::listener::Listener;
 use bridge_core::relay::{Relay, Relayer};
@@ -70,7 +70,7 @@ impl Config for CustomConfig {
 pub async fn create_listener<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send>(
     id: &str,
     handle: Handle,
-    ws_rpc_endpoint: &str,
+    config: &ListenerConfig,
     relayer: Box<dyn Relayer>,
     stop_signal: Receiver<()>,
 ) -> Result<
@@ -82,7 +82,7 @@ pub async fn create_listener<ChainConfig: Config, PayInEventType: StaticEvent + 
     (),
 > {
     let client_factory: RpcClientFactory<ChainConfig, PayInEventType> =
-        RpcClientFactory::new(ws_rpc_endpoint);
+        RpcClientFactory::new(&config.ws_rpc_endpoint);
 
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository =
