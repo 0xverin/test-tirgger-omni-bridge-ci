@@ -17,16 +17,13 @@
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use bridge_core::listener::PayIn;
-use log::{debug, error};
+use log::*;
 
 use crate::rpc_client::SubstrateRpcClientFactory;
 use crate::{listener::PayInEventId, rpc_client::SubstrateRpcClient};
 
 /// Used for fetching data from substrate based chains required by the `Listener`
-pub struct Fetcher<
-    RpcClient: SubstrateRpcClient,
-    RpcClientFactory: SubstrateRpcClientFactory<RpcClient>,
-> {
+pub struct Fetcher<RpcClient: SubstrateRpcClient, RpcClientFactory: SubstrateRpcClientFactory<RpcClient>> {
     client_factory: RpcClientFactory,
     client: Option<RpcClient>,
 }
@@ -35,10 +32,7 @@ impl<RpcClient: SubstrateRpcClient, RpcClientFactory: SubstrateRpcClientFactory<
     Fetcher<RpcClient, RpcClientFactory>
 {
     pub fn new(client_factory: RpcClientFactory) -> Self {
-        Self {
-            client: None,
-            client_factory,
-        }
+        Self { client: None, client_factory }
     }
 
     async fn connect_if_needed(&mut self) {
@@ -75,10 +69,7 @@ impl<
         RpcClientFactory: SubstrateRpcClientFactory<RpcClient> + Sync + Send,
     > BlockPayInEventsFetcher<PayInEventId, ()> for Fetcher<RpcClient, RpcClientFactory>
 {
-    async fn get_block_pay_in_events(
-        &mut self,
-        block_num: u64,
-    ) -> Result<Vec<PayIn<PayInEventId, ()>>, ()> {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, ()>>, ()> {
         self.connect_if_needed().await;
 
         if let Some(ref mut client) = self.client {

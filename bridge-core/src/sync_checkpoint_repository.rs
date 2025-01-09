@@ -68,9 +68,7 @@ pub struct FileCheckpointRepository {
 impl FileCheckpointRepository {
     pub fn new(file_name: &str) -> Self {
         // todo add regex check here
-        Self {
-            file_name: file_name.to_owned(),
-        }
+        Self { file_name: file_name.to_owned() }
     }
 }
 
@@ -81,18 +79,17 @@ where
     fn get(&self) -> Result<Option<Checkpoint>, ()> {
         match fs::read(&self.file_name) {
             Ok(content) => {
-                let checkpoint: Checkpoint =
-                    Checkpoint::decode(&mut content.as_slice()).map_err(|e| {
-                        log::error!("Could not decode last processed log: {:?}", e);
-                    })?;
+                let checkpoint: Checkpoint = Checkpoint::decode(&mut content.as_slice()).map_err(|e| {
+                    log::error!("Could not decode last processed log: {:?}", e);
+                })?;
                 Ok(Some(checkpoint))
-            }
+            },
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => Ok(None),
                 _ => {
                     log::error!("Could not open file {:?}", e);
                     Err(())
-                }
+                },
             },
         }
     }

@@ -29,8 +29,5 @@ pub trait LastFinalizedBlockNumFetcher {
 /// fetch events from all of them together.
 #[async_trait]
 pub trait BlockPayInEventsFetcher<Id: Clone, EventSourceId: Clone> {
-    async fn get_block_pay_in_events(
-        &mut self,
-        block_num: u64,
-    ) -> Result<Vec<PayIn<Id, EventSourceId>>, ()>;
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<Id, EventSourceId>>, ()>;
 }

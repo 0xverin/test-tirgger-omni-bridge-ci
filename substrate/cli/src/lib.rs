@@ -43,9 +43,7 @@ pub async fn handle(command: &SubstrateCommand) {
     let rpc_url = "ws://localhost:9944";
     let alice_signer = dev::alice();
 
-    let api = OnlineClient::<PolkadotConfig>::from_insecure_url(rpc_url)
-        .await
-        .unwrap();
+    let api = OnlineClient::<PolkadotConfig>::from_insecure_url(rpc_url).await.unwrap();
 
     match command {
         SubstrateCommand::SetupDevChainBridge(conf) => {
@@ -58,11 +56,7 @@ pub async fn handle(command: &SubstrateCommand) {
             info!("Adding Relayer to the OmniBridge Pallet");
             let hash = api
                 .tx()
-                .sign_and_submit_then_watch(
-                    &add_relayer_sudo_call,
-                    &alice_signer,
-                    Default::default(),
-                )
+                .sign_and_submit_then_watch(&add_relayer_sudo_call, &alice_signer, Default::default())
                 .await
                 .unwrap();
 
@@ -131,7 +125,7 @@ pub async fn handle(command: &SubstrateCommand) {
                 .unwrap();
 
             hash.wait_for_finalized().await.unwrap();
-        }
+        },
         SubstrateCommand::Balance { account } => {
             // Query the account balance from the chain's `Balances` storage
             let account: AccountId32 = AccountId32::from_str(account).unwrap();
@@ -153,7 +147,7 @@ pub async fn handle(command: &SubstrateCommand) {
             } else {
                 println!("0");
             }
-        }
+        },
         SubstrateCommand::DevTestWithdraw => {
             let recipient_address = Vec::<u8>::from_hex("70997970C51812dc3A010C7d01b50e0d17dc79C8")
                 .expect("Failed to decode string");
@@ -171,15 +165,11 @@ pub async fn handle(command: &SubstrateCommand) {
 
             let hash = api
                 .tx()
-                .sign_and_submit_then_watch(
-                    &transfer_assets_call,
-                    &alice_signer,
-                    Default::default(),
-                )
+                .sign_and_submit_then_watch(&transfer_assets_call, &alice_signer, Default::default())
                 .await
                 .unwrap();
 
             hash.wait_for_finalized().await.unwrap();
-        }
+        },
     }
 }

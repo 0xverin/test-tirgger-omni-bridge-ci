@@ -27,10 +27,7 @@ pub struct EventId {
 
 impl EventId {
     pub fn new(block_num: u64, event_idx: u64) -> Self {
-        Self {
-            block_num,
-            event_idx,
-        }
+        Self { block_num, event_idx }
     }
 }
 
@@ -43,10 +40,7 @@ pub struct SyncCheckpoint {
 
 impl SyncCheckpoint {
     pub fn new(block_num: u64, event_idx: Option<u64>) -> Self {
-        Self {
-            block_num,
-            event_idx,
-        }
+        Self { block_num, event_idx }
     }
 
     pub fn from_event_id(event_id: &EventId) -> Self {

@@ -4,8 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-bridge-core = { path = "../../bridge-core" }
+bridge-core = { workspace = true }
 async-trait = { workspace = true }
 alloy = { workspace = true, features = ["contract", "signer-local"]}
 log = { workspace = true }
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { workspace = true }

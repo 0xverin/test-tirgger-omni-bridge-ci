@@ -14,19 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use bridge_core::listener::Listener;
-use serde::Deserialize;
+use rsa::{RsaPrivateKey, RsaPublicKey};
 
-use crate::fetcher::Fetcher;
-use crate::primitives::EventId;
-use crate::primitives::SyncCheckpoint;
+pub struct ShieldingKey {
+    key: RsaPrivateKey,
+}
 
-pub type PayInEventId = EventId;
+impl ShieldingKey {
+    pub fn new() -> Self {
+        // create new
+        let mut rng = rand::thread_rng();
+        let bits = 3072;
+        let key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+        Self { key }
+    }
 
-pub type SubstrateListener<RpcClient, RpcClientFactory, CheckpointRepository> =
-    Listener<(), Fetcher<RpcClient, RpcClientFactory>, SyncCheckpoint, CheckpointRepository, PayInEventId>;
+    #[cfg(test)]
+    pub fn init_with(key: RsaPrivateKey) -> Self {
+        Self { key }
+    }
 
-#[derive(Deserialize)]
-pub struct ListenerConfig {
-    pub ws_rpc_endpoint: String,
+    pub fn public_key(&self) -> RsaPublicKey {
+        self.key.to_public_key()
+    }
+
+    pub fn private_key(&self) -> &RsaPrivateKey {
+        &self.key
+    }
 }

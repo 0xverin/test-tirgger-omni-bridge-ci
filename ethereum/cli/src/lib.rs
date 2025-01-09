@@ -21,9 +21,7 @@ use alloy::dyn_abi::DynSolValue;
 use alloy::hex::{decode, FromHex};
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
-use alloy::providers::fillers::{
-    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
-};
+use alloy::providers::fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
 use alloy::providers::{Identity, ProviderBuilder, RootProvider};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol;
@@ -112,33 +110,18 @@ pub async fn handle(command: &EthereumCommand) {
     // this is the first private key printed out by anvil during startup
     match command {
         EthereumCommand::Bridge(conf) => {
-            let erc_20_handler_address =
-                Address::from_slice(&decode(&conf.bridge_erc20_handler_address).unwrap());
+            let erc_20_handler_address = Address::from_slice(&decode(&conf.bridge_erc20_handler_address).unwrap());
             let hei_address = Address::from_slice(&decode(&conf.hei_token_address).unwrap());
 
             let user_signer =
-                alloy::signers::local::PrivateKeySigner::from_str(conf.user_private_key.as_str())
-                    .unwrap();
+                alloy::signers::local::PrivateKeySigner::from_str(conf.user_private_key.as_str()).unwrap();
             let address = user_signer.address();
 
             // transfer some tokens to user
-            transfer_lit_to(
-                &conf.bridge_private_key,
-                address,
-                &conf.amount,
-                &conf.lit_token_address,
-                rpc_url,
-            )
-            .await;
+            transfer_lit_to(&conf.bridge_private_key, address, &conf.amount, &conf.lit_token_address, rpc_url).await;
             // approve lit spending to HEI contract
-            approve_lit_to(
-                conf.user_private_key.as_str(),
-                hei_address,
-                &conf.amount,
-                &conf.lit_token_address,
-                rpc_url,
-            )
-            .await;
+            approve_lit_to(conf.user_private_key.as_str(), hei_address, &conf.amount, &conf.lit_token_address, rpc_url)
+                .await;
 
             // approve HEI spending to ERC-20 handler contract
             approve_hei_to(
@@ -151,14 +134,7 @@ pub async fn handle(command: &EthereumCommand) {
             .await;
 
             // wrap some LIT tokens to HEI tokens
-            wrap_to(
-                conf.user_private_key.as_str(),
-                address,
-                &conf.amount,
-                &conf.hei_token_address,
-                rpc_url,
-            )
-            .await;
+            wrap_to(conf.user_private_key.as_str(), address, &conf.amount, &conf.hei_token_address, rpc_url).await;
 
             // deposit on bridge instance
             bridge_deposit(
@@ -169,7 +145,7 @@ pub async fn handle(command: &EthereumCommand) {
                 rpc_url,
             )
             .await;
-        }
+        },
         EthereumCommand::AddRelayer(conf) => {
             add_relayer(
                 &conf.bridge_private_key,
@@ -178,7 +154,7 @@ pub async fn handle(command: &EthereumCommand) {
                 rpc_url,
             )
             .await;
-        }
+        },
         EthereumCommand::SetupBridge(conf) => {
             setup_bridge(
                 &conf.bridge_private_key,
@@ -204,38 +180,16 @@ async fn transfer_lit_to(
     rpc_url: &str,
 ) {
     info!("Transferring LIT amount {} to {}", amount, address);
-    let lit_token_instance =
-        lit_token_instance(lit_token_address, bridge_owner_private_key, rpc_url).await;
-    let transfer_builder =
-        lit_token_instance.transfer(address, U256::from_str_radix(amount, 10).unwrap());
-    transfer_builder
-        .send()
-        .await
-        .unwrap()
-        .watch()
-        .await
-        .unwrap();
+    let lit_token_instance = lit_token_instance(lit_token_address, bridge_owner_private_key, rpc_url).await;
+    let transfer_builder = lit_token_instance.transfer(address, U256::from_str_radix(amount, 10).unwrap());
+    transfer_builder.send().await.unwrap().watch().await.unwrap();
 }
 
-async fn wrap_to(
-    owner_private_key: &str,
-    address: Address,
-    amount: &str,
-    hei_token_address: &str,
-    rpc_url: &str,
-) {
+async fn wrap_to(owner_private_key: &str, address: Address, amount: &str, hei_token_address: &str, rpc_url: &str) {
     info!("Wrapping LIT amount {} to {}", amount, address);
-    let hei_token_instance =
-        hei_token_instance(hei_token_address, owner_private_key, rpc_url).await;
-    let transfer_builder =
-        hei_token_instance.depositFor(address, U256::from_str_radix(amount, 10).unwrap());
-    transfer_builder
-        .send()
-        .await
-        .unwrap()
-        .watch()
-        .await
-        .unwrap();
+    let hei_token_instance = hei_token_instance(hei_token_address, owner_private_key, rpc_url).await;
+    let transfer_builder = hei_token_instance.depositFor(address, U256::from_str_radix(amount, 10).unwrap());
+    transfer_builder.send().await.unwrap().watch().await.unwrap();
 }
 
 async fn query_hei_token_amount(
@@ -267,10 +221,8 @@ async fn approve_lit_to(
     rpc_url: &str,
 ) {
     info!("Approving LIT amount {} to {}", amount, spender);
-    let lit_token_instance =
-        lit_token_instance(lit_token_address, owner_private_key, rpc_url).await;
-    let approve_builder =
-        lit_token_instance.approve(spender, U256::from_str_radix(amount, 10).unwrap());
+    let lit_token_instance = lit_token_instance(lit_token_address, owner_private_key, rpc_url).await;
+    let approve_builder = lit_token_instance.approve(spender, U256::from_str_radix(amount, 10).unwrap());
     approve_builder.send().await.unwrap().watch().await.unwrap();
 }
 
@@ -282,10 +234,8 @@ async fn approve_hei_to(
     rpc_url: &str,
 ) {
     info!("Approving HEI amount {} to {}", amount, spender);
-    let hei_token_instance =
-        hei_token_instance(hei_token_address, owner_private_key, rpc_url).await;
-    let approve_builder =
-        hei_token_instance.approve(spender, U256::from_str_radix(amount, 10).unwrap());
+    let hei_token_instance = hei_token_instance(hei_token_address, owner_private_key, rpc_url).await;
+    let approve_builder = hei_token_instance.approve(spender, U256::from_str_radix(amount, 10).unwrap());
     approve_builder.send().await.unwrap().watch().await.unwrap();
 }
 async fn add_relayer(by_private_key: &str, bridge_address: &str, relayer: Address, rpc_url: &str) {
@@ -327,13 +277,7 @@ async fn setup_bridge(
 
 }
 
-async fn bridge_deposit(
-    by_private_key: &str,
-    amount: &str,
-    account: String,
-    bridge_address: &str,
-    rpc_url: &str,
-) {
+async fn bridge_deposit(by_private_key: &str, amount: &str, account: String, bridge_address: &str, rpc_url: &str) {
     info!("Bridging deposit");
     let bridge_instance = bridge_instance(bridge_address, by_private_key, rpc_url).await;
     let resource_id = FixedBytes([158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223, 138, 246, 22, 42, 177, 69, 166]);

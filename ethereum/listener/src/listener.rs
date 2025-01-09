@@ -55,9 +55,7 @@ pub mod tests {
     };
 
     use crate::fetcher::{Fetcher, EVENT_TOPIC};
-    use crate::{
-        listener::EthereumListener, primitives::SyncCheckpoint, rpc_client::mocks::MockedRpcClient,
-    };
+    use crate::{listener::EthereumListener, primitives::SyncCheckpoint, rpc_client::mocks::MockedRpcClient};
     use crate::{
         primitives::{Log, LogId},
         rpc_client::mocks::MockedRpcClientBuilder,
@@ -94,34 +92,25 @@ pub mod tests {
 
         logs.insert(1, block_1_logs.clone());
 
-        let rpc_client = MockedRpcClientBuilder::new()
-            .with_block_logs(logs)
-            .with_block_number(1)
-            .build();
+        let rpc_client = MockedRpcClientBuilder::new().with_block_logs(logs).with_block_number(1).build();
 
         let mut relay_map: HashMap<Address, Box<dyn Relayer>> = HashMap::new();
-        relay_map.insert(
-            Address::from_str(source).map_err(|_| ()).unwrap(),
-            Box::new(relay),
-        );
+        relay_map.insert(Address::from_str(source).map_err(|_| ()).unwrap(), Box::new(relay));
 
-        let fetcher: Fetcher<MockedRpcClient> =
-            Fetcher::new(0, rpc_client, relay_map.keys().copied().collect());
+        let fetcher: Fetcher<MockedRpcClient> = Fetcher::new(0, rpc_client, relay_map.keys().copied().collect());
 
         let (stop_sender, stop_receiver) = oneshot::channel();
 
-        let mut listener: EthereumListener<
-            MockedRpcClient,
-            InMemoryCheckpointRepository<SyncCheckpoint>,
-        > = EthereumListener::new(
-            "test",
-            Handle::current().clone(),
-            fetcher,
-            Relay::Multi(relay_map),
-            stop_receiver,
-            InMemoryCheckpointRepository::new(None),
-        )
-        .unwrap();
+        let mut listener: EthereumListener<MockedRpcClient, InMemoryCheckpointRepository<SyncCheckpoint>> =
+            EthereumListener::new(
+                "test",
+                Handle::current().clone(),
+                fetcher,
+                Relay::Multi(relay_map),
+                stop_receiver,
+                InMemoryCheckpointRepository::new(None),
+            )
+            .unwrap();
 
         let _handle = thread::spawn(move || listener.sync(start_block));
 
@@ -196,33 +185,24 @@ pub mod tests {
 
         logs.insert(2, block_2_logs.clone());
 
-        let rpc_client = MockedRpcClientBuilder::new()
-            .with_block_logs(logs)
-            .with_block_number(2)
-            .build();
+        let rpc_client = MockedRpcClientBuilder::new().with_block_logs(logs).with_block_number(2).build();
         let (stop_sender, stop_receiver) = oneshot::channel();
 
         let mut relay_map: HashMap<Address, Box<dyn Relayer>> = HashMap::new();
-        relay_map.insert(
-            Address::from_str(source).map_err(|_| ()).unwrap(),
-            Box::new(relay),
-        );
+        relay_map.insert(Address::from_str(source).map_err(|_| ()).unwrap(), Box::new(relay));
 
-        let fetcher: Fetcher<MockedRpcClient> =
-            Fetcher::new(0, rpc_client, relay_map.keys().copied().collect());
+        let fetcher: Fetcher<MockedRpcClient> = Fetcher::new(0, rpc_client, relay_map.keys().copied().collect());
 
-        let mut listener: EthereumListener<
-            MockedRpcClient,
-            InMemoryCheckpointRepository<SyncCheckpoint>,
-        > = EthereumListener::new(
-            "test",
-            Handle::current().clone(),
-            fetcher,
-            Relay::Multi(relay_map),
-            stop_receiver,
-            InMemoryCheckpointRepository::new(Some(SyncCheckpoint::new(2, Some(1), Some(2)))),
-        )
-        .unwrap();
+        let mut listener: EthereumListener<MockedRpcClient, InMemoryCheckpointRepository<SyncCheckpoint>> =
+            EthereumListener::new(
+                "test",
+                Handle::current().clone(),
+                fetcher,
+                Relay::Multi(relay_map),
+                stop_receiver,
+                InMemoryCheckpointRepository::new(Some(SyncCheckpoint::new(2, Some(1), Some(2)))),
+            )
+            .unwrap();
 
         let _handle = thread::spawn(move || listener.sync(start_block));
 
@@ -239,9 +219,6 @@ pub mod tests {
             assert!(receiver.recv().await.is_some());
             log::info!("Got event");
         }
-        assert!(
-            receiver.try_recv().is_err(),
-            "Received more events than expected"
-        );
+        assert!(receiver.try_recv().is_err(), "Received more events than expected");
     }
 }

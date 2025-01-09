@@ -5,13 +5,13 @@ edition = "2021"
 
 [dependencies]
 log = { workspace = true }
-bridge-core = { path = "../../bridge-core" }
+bridge-core = { workspace = true }
 async-trait = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive"] }
-subxt = "0.37.0"
-scale-encode = "0.7.1"
-tokio = {  workspace = true, features = ["macros", "rt-multi-thread"] }
-serde = { workspace = true, features = ["derive"] }
+parity-scale-codec = { workspace = true }
+subxt = { workspace = true }
+serde = { workspace = true }
+scale-encode = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

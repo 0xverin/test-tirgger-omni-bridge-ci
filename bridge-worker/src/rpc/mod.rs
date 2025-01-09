@@ -14,19 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use bridge_core::listener::Listener;
-use serde::Deserialize;
-
-use crate::fetcher::Fetcher;
-use crate::primitives::EventId;
-use crate::primitives::SyncCheckpoint;
-
-pub type PayInEventId = EventId;
-
-pub type SubstrateListener<RpcClient, RpcClientFactory, CheckpointRepository> =
-    Listener<(), Fetcher<RpcClient, RpcClientFactory>, SyncCheckpoint, CheckpointRepository, PayInEventId>;
-
-#[derive(Deserialize)]
-pub struct ListenerConfig {
-    pub ws_rpc_endpoint: String,
-}
+pub mod error_code;
+pub mod methods;
+pub mod server;

@@ -37,3 +37,17 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Build
+        run: |
+          make build-evm-contracts
+          make build-docker

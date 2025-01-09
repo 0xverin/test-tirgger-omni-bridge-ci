@@ -14,26 +14,63 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::cli::*;
+use crate::rpc::methods::{ImportRelayerKeyPayload, SignedParams};
+use crate::shielding_key::ShieldingKey;
+use crate::keystore::LocalKeystore;
+
 use bridge_core::config::BridgeConfig;
 use bridge_core::listener::{prepare_listener_context, ListenerContext};
 use bridge_core::relay::Relayer;
+use clap::Parser;
 use ethereum_listener::create_listener;
 use ethereum_listener::listener::ListenerConfig as EthereumListenerConfig;
-use log::error;
+use jsonrpsee_types::Id;
+use log::*;
+use rand::rngs::OsRng;
+use rand::Rng;
+use rpc::server::start_server;
+use rsa::{BigUint, Oaep, RsaPublicKey};
+use rsa::traits::PublicKeyParts;
+use serde_json::value::RawValue;
+use sha2::Sha256;
+use sp_core::{keccak_256, ByteArray, Pair};
 use std::collections::HashMap;
 use std::thread::JoinHandle;
-use std::{env, thread};
 use std::{fs, io::Write};
+use std::{sync::{Arc, RwLock}, thread};
 use substrate_listener::listener::ListenerConfig as SubstrateListenerConfig;
 use substrate_listener::CustomConfig;
-use tokio::{runtime::Handle, sync::oneshot};
+use tokio::{runtime::Handle, sync::oneshot, signal};
+
+mod cli;
+mod keystore;
+mod rpc;
+mod shielding_key;
+
+#[cfg(test)]
+fn alice_signer() -> [u8; 33] {
+    let key = sp_core::ecdsa::Pair::from_string("//Alice", None).unwrap();
+    key.public().0
+}
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    assert_eq!(args.len(), 2);
-    let config_file = args.get(1).unwrap();
+    match &cli.command {
+        Commands::Run(arg) => run(arg).await?,
+        Commands::AwaitKeystoreImport(arg) => await_import(arg).await,
+        Commands::GenerateAuthKey => generate_auth_key(),
+        Commands::BuildKeystoreImport(arg) => build_import(arg),
+    }
+
+    Ok(())
+}
+
+async fn run(arg: &RunArgs) -> Result<(), ()> {
+    let config_file = arg.config.clone();
+    let keystore_dir = arg.keystore_dir.clone();
 
     let mut handles = vec![];
 
@@ -51,10 +88,6 @@ async fn main() -> Result<(), ()> {
         })
         .init();
 
-    fs::create_dir_all("data/").map_err(|_| {
-        error!("Could not create data dir");
-    })?;
-
     let config: String = fs::read_to_string(config_file).unwrap();
     let config: BridgeConfig = serde_json::from_str(&config).unwrap();
 
@@ -62,12 +95,11 @@ async fn main() -> Result<(), ()> {
 
     // substrate relayers
     let substrate_relayers: HashMap<String, Box<dyn Relayer>> =
-        substrate_relayer::create_from_config::<CustomConfig>(&config);
+        substrate_relayer::create_from_config::<CustomConfig>(keystore_dir.clone(), &config);
     relayers.insert("substrate".to_string(), substrate_relayers);
 
     // ethereum relayers
-    let ethereum_relayers: HashMap<String, Box<dyn Relayer>> =
-        ethereum_relayer::create_from_config(&config);
+    let ethereum_relayers: HashMap<String, Box<dyn Relayer>> = ethereum_relayer::create_from_config(keystore_dir, &config);
     relayers.insert("ethereum".to_string(), ethereum_relayers);
 
     // start ethereum listeners
@@ -82,11 +114,7 @@ async fn main() -> Result<(), ()> {
         prepare_listener_context(&config, "substrate", &mut relayers);
     for substrate_listener_context in substrate_listener_contexts {
         // todo: remove unwrap ??
-        handles.push(
-            sync_litentry_rococo(substrate_listener_context)
-                .await
-                .unwrap(),
-        )
+        handles.push(sync_litentry_rococo(substrate_listener_context).await.unwrap())
     }
 
     for handle in handles {
@@ -96,9 +124,33 @@ async fn main() -> Result<(), ()> {
     Ok(())
 }
 
-async fn sync_litentry_rococo(
-    mut context: ListenerContext<SubstrateListenerConfig>,
-) -> Result<JoinHandle<()>, ()> {
+fn generate_auth_key() {
+    println!("Generating auth key ...");
+    let mut seed = [0u8; 32];
+    OsRng.fill(&mut seed);
+    let pair = sp_core::ecdsa::Pair::from_seed_slice(&seed).unwrap();
+    fs::write(AUTH_KEY_SEED_PATH, hex::encode(pair.seed().as_slice())).unwrap();
+    fs::write(AUTH_KEY_PUB_PATH, hex::encode(pair.public().as_slice())).unwrap();
+
+    println!("Auth public key in hex: {}", hex::encode(pair.public().as_slice()));
+    println!("Auth private key saved to file: {} ", AUTH_KEY_SEED_PATH);
+}
+
+fn build_import(arg: &ImportArgs) {
+    println!("Generating import relayer key command ...");
+    let shielding_key = fs::read(arg.shielding_key_path.clone()).unwrap();
+    let shielding_key: rpc::methods::ShieldingKey = serde_json::from_slice(shielding_key.as_slice()).unwrap();
+    let shielding_key =
+        RsaPublicKey::new(BigUint::from_bytes_le(&shielding_key.n), BigUint::from_bytes_le(&shielding_key.e)).unwrap();
+
+    let auth_key = fs::read(arg.auth_key_path.clone()).unwrap();
+    let auth_key = sp_core::ecdsa::Pair::from_seed_slice(&hex::decode(&auth_key).unwrap()).unwrap();
+
+    build_import_internal(arg.substrate_id.clone(), arg.substrate_relayer_key_path.clone(), &shielding_key, &auth_key);
+    build_import_internal(arg.ethereum_id.clone(), arg.ethereum_relayer_key_path.clone(), &shielding_key, &auth_key);
+}
+
+async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConfig>) -> Result<JoinHandle<()>, ()> {
     let (_sub_stop_sender, sub_stop_receiver) = oneshot::channel();
 
     //todo: for now we assume there is only one relayer =]
@@ -121,9 +173,7 @@ async fn sync_litentry_rococo(
         .unwrap())
 }
 
-fn sync_ethereum(
-    mut context: ListenerContext<EthereumListenerConfig>,
-) -> Result<JoinHandle<()>, ()> {
+fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result<JoinHandle<()>, ()> {
     let finalization_gap_blocks = 6;
 
     assert_eq!(context.relayers.len(), 1);
@@ -144,4 +194,67 @@ fn sync_ethereum(
         .name(context.id.to_string())
         .spawn(move || eth_listener.sync(0))
         .unwrap())
+}
+
+fn build_import_internal(id: String, key_path: String, shielding_key: &RsaPublicKey, auth_key: &sp_core::ecdsa::Pair) {
+    let relayer_key = fs::read(key_path).unwrap();
+    let relayer_key = hex::decode(&relayer_key).unwrap();
+
+    let shielded_relayer_key = shielding_key.encrypt(&mut OsRng, Oaep::new::<Sha256>(), &relayer_key).unwrap();
+
+    let import_payload = ImportRelayerKeyPayload { id: id.clone(), key: shielded_relayer_key };
+    let import_signature = auth_key
+        .sign_prehashed(&keccak_256(&serde_json::to_vec(&import_payload).unwrap()))
+        .to_raw();
+    let import_signed_params = SignedParams { payload: import_payload, signature: import_signature };
+    let import_request = jsonrpsee_types::RequestSer::owned(
+        Id::Number(0),
+        "hm_importRelayerKey",
+        Some(RawValue::from_string(serde_json::to_string(&import_signed_params).unwrap()).unwrap()),
+    );
+
+    println!("\nImport {} relayer key cmd:", id);
+    println!(
+        "curl -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:2000",
+        serde_json::to_string(&import_request).unwrap()
+    );
+}
+
+async fn await_import(arg: &AwaitImportArgs) {
+    println!("Generating shielding key ...");
+    let shielding_key = Arc::new(ShieldingKey::new());
+    println!(
+        "Shielding key: {}",
+        serde_json::to_string(&rpc::methods::ShieldingKey {
+            n: shielding_key.public_key().n().to_bytes_le(),
+            e: shielding_key.public_key().e().to_bytes_le()
+        })
+        .unwrap()
+    );
+
+    let import_keystore_signer: [u8; 33] =
+        hex::decode(fs::read(&arg.auth_pub_key_path).unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+    let keystore = Arc::new(RwLock::new(LocalKeystore::open(arg.keystore_dir.clone().into()).unwrap()));
+
+    println!("Start server and wait for keystore import ...");
+
+    start_server("0.0.0.0:2000", Handle::current(), import_keystore_signer, keystore, shielding_key).await;
+
+    await_signal().await;
+    println!("Bridge worker stopped");
+}
+
+async fn await_signal() {
+    match signal::ctrl_c().await {
+        Ok(()) => {
+            info!("Received Ctrl-C");
+        },
+        Err(err) => {
+            eprintln!("Unable to listen for shutdown signal: {}", err);
+            // we also shut down in case of error
+        },
+    }
 }

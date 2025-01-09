@@ -47,7 +47,7 @@ pub struct SubstrateRelayer<T: Config> {
     _phantom: PhantomData<T>,
 }
 
-pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
+pub fn create_from_config<T: Config>(keystore_dir: String, config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
     let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
     for relayer_config in config
         .relayers
@@ -55,7 +55,7 @@ pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, B
         .filter(|r| r.relayer_type == "substrate")
     {
         let key_store =
-            SubstrateKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
+            SubstrateKeyStore::new(format!("{}/{}.bin", keystore_dir.clone(), relayer_config.id));
 
         let signer = subxt_signer::sr25519::Keypair::from_secret_key(key_store.read().unwrap())
             .map_err(|e| {
@@ -69,8 +69,7 @@ pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, B
         );
 
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
-        let relayer: SubstrateRelayer<T> =
-            SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
+        let relayer: SubstrateRelayer<T> = SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
         relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
     }
 
@@ -98,10 +97,7 @@ impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
     ) -> Result<(), ()> {
         let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
         let account: AccountId32 = AccountId32::from(account_bytes);
-        debug!(
-            "Relaying amount: {} with nonce: {} to account: {:?}",
-            amount, nonce, account
-        );
+        debug!("Relaying amount: {} with nonce: {} to account: {:?}", amount, nonce, account);
 
         let request = litentry_rococo::runtime_types::pallet_omni_bridge::PayOutRequest {
             //todo: should not be hardcoded

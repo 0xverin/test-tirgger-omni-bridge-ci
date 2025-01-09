@@ -35,16 +35,14 @@ pub trait KeyStore<K> {
     fn write(&self, k: &K) -> Result<(), ()> {
         match File::create(self.path()) {
             Ok(mut file) => {
-                file.write(
-                    &Self::serialize(k).map_err(|e| error!("Error writing to file: {:?}", e))?,
-                )
-                .map_err(|_| ())?;
+                file.write(&Self::serialize(k).map_err(|e| error!("Error writing to file: {:?}", e))?)
+                    .map_err(|_| ())?;
                 Ok(())
-            }
+            },
             Err(e) => {
                 error!("Could not seal data to file {}: {:?}", self.path(), e);
                 Err(())
-            }
+            },
         }
     }
 }

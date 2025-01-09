@@ -26,10 +26,7 @@ pub struct EthereumKeyStore {
 
 impl EthereumKeyStore {
     pub fn new(path: String) -> Self {
-        let key = Self::generate_key().expect("Could not generate key");
-        let store: EthereumKeyStore = Self { path };
-        store.write(&key).expect("Could not write key");
-        store
+        Self { path }
     }
 }
 

@@ -28,11 +28,7 @@ pub struct SyncCheckpoint {
 
 impl SyncCheckpoint {
     pub fn new(block_num: u64, tx_idx: Option<u64>, log_idx: Option<u64>) -> Self {
-        Self {
-            block_num,
-            tx_idx,
-            log_idx,
-        }
+        Self { block_num, tx_idx, log_idx }
     }
 
     pub fn from_log_id(id: &LogId) -> Self {
@@ -107,11 +103,7 @@ pub struct LogId {
 
 impl LogId {
     pub fn new(block_num: u64, tx_idx: u64, log_idx: u64) -> Self {
-        LogId {
-            block_num,
-            tx_idx,
-            log_idx,
-        }
+        LogId { block_num, tx_idx, log_idx }
     }
 }
 

@@ -4,8 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-clap = { workspace = true, features = ["derive"] }
-ethereum-cli = { path = "../ethereum/cli" }
-substrate-cli = { path = "../substrate/cli" }
-env_logger = "0.11.6"
+tokio = { workspace = true }
+clap = { workspace = true }
+env_logger = { workspace = true }
+ethereum-cli = { workspace = true }
+substrate-cli = { workspace = true }

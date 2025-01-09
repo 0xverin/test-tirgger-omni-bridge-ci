@@ -61,17 +61,8 @@ impl<ChainConfig: Config> RpcClient<ChainConfig> {}
 #[async_trait]
 impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()> {
-        let finalized_header = self
-            .legacy
-            .chain_get_finalized_head()
-            .await
-            .map_err(|_| ())?;
-        match self
-            .legacy
-            .chain_get_header(Some(finalized_header))
-            .await
-            .map_err(|_| ())?
-        {
+        let finalized_header = self.legacy.chain_get_finalized_head().await.map_err(|_| ())?;
+        match self.legacy.chain_get_header(Some(finalized_header)).await.map_err(|_| ())? {
             Some(header) => Ok(header.number().into()),
             None => Err(()),
         }
@@ -87,11 +78,7 @@ impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
             .map_err(|_| ())?
         {
             Some(hash) => {
-                let events = self
-                    .events
-                    .at(BlockRef::from_hash(hash))
-                    .await
-                    .map_err(|_| ())?;
+                let events = self.events.at(BlockRef::from_hash(hash)).await.map_err(|_| ())?;
 
                 let pay_in_events =
                     events.find::<crate::litentry_rococo::omni_bridge::events::PaidIn>();
@@ -112,7 +99,7 @@ impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
                         )
                     })
                     .collect())
-            }
+            },
             None => Err(()),
         }
     }
@@ -153,10 +140,7 @@ pub struct RpcClientFactory<ChainConfig: Config> {
 
 impl<ChainConfig: Config> RpcClientFactory<ChainConfig> {
     pub fn new(url: &str) -> Self {
-        Self {
-            url: url.to_string(),
-            _phantom: PhantomData,
-        }
+        Self { url: url.to_string(), _phantom: PhantomData }
     }
 }
 
@@ -172,11 +156,9 @@ impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>>
             })?;
         let legacy = LegacyRpcMethods::new(rpc_client);
 
-        let online_client = OnlineClient::from_insecure_url(self.url.clone())
-            .await
-            .map_err(|e| {
-                log::error!("Could not create OnlineClient: {:?}", e);
-            })?;
+        let online_client = OnlineClient::from_insecure_url(self.url.clone()).await.map_err(|e| {
+            log::error!("Could not create OnlineClient: {:?}", e);
+        })?;
         let events = online_client.events();
 
         Ok(RpcClient { legacy, events })

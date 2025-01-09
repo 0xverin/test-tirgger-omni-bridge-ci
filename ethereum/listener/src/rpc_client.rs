@@ -36,12 +36,7 @@ use alloy::sol;
 #[async_trait]
 pub trait EthereumRpcClient {
     async fn get_block_number(&self) -> Result<u64, ()>;
-    async fn get_block_logs(
-        &self,
-        block_number: u64,
-        addresses: Vec<Address>,
-        event: &str,
-    ) -> Result<Vec<Log>, ()>;
+    async fn get_block_logs(&self, block_number: u64, addresses: Vec<Address>, event: &str) -> Result<Vec<Log>, ()>;
 }
 
 pub struct EthersRpcClient {
@@ -66,12 +61,7 @@ impl EthereumRpcClient for EthersRpcClient {
     }
 
     // TODO: Are there too many unwraps?
-    async fn get_block_logs(
-        &self,
-        block_number: u64,
-        addresses: Vec<Address>,
-        event: &str,
-    ) -> Result<Vec<Log>, ()> {
+    async fn get_block_logs(&self, block_number: u64, addresses: Vec<Address>, event: &str) -> Result<Vec<Log>, ()> {
         let filter: Filter = Filter::new()
             .from_block(block_number)
             .to_block(block_number)
@@ -155,10 +145,7 @@ pub mod mocks {
             _addresses: Vec<Address>,
             _event: &str,
         ) -> Result<Vec<Log>, ()> {
-            self.block_logs
-                .get(&block_number)
-                .map(|logs| logs.to_owned())
-                .ok_or(())
+            self.block_logs.get(&block_number).map(|logs| logs.to_owned()).ok_or(())
         }
     }
 }

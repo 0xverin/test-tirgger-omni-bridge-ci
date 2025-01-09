@@ -48,8 +48,7 @@ pub fn create_listener(
         error!("Could not connect to rpc: {:?}", e);
     })?;
 
-    let last_processed_log_repository =
-        FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
+    let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
     // TODO: Values should be receieved via CLAP instead of hardcoding
     let fetcher: Fetcher<EthersRpcClient> = Fetcher::new(
@@ -59,15 +58,8 @@ pub fn create_listener(
     );
 
     let ethereum_listener: EthereumListener<EthersRpcClient, FileCheckpointRepository> =
-        Listener::new(
-            id,
-            handle,
-            fetcher,
-            relay::Relay::Single(relays),
-            stop_signal,
-            last_processed_log_repository,
-        )
-        .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
+        Listener::new(id, handle, fetcher, relay::Relay::Single(relays), stop_signal, last_processed_log_repository)
+            .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
 
     Ok(ethereum_listener)
 }

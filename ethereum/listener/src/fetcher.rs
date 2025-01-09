@@ -53,12 +53,7 @@ pub struct Fetcher<RpcClient> {
 
 impl<C> Fetcher<C> {
     pub fn new(finalization_gap_blocks: u64, client: C, event_sources: HashSet<Address>) -> Self {
-        Self {
-            finalization_gap_blocks,
-            client,
-            event_sources,
-            event_topic: keccak256(EVENT_TOPIC.as_bytes()),
-        }
+        Self { finalization_gap_blocks, client, event_sources, event_topic: keccak256(EVENT_TOPIC.as_bytes()) }
     }
 }
 
@@ -71,36 +66,22 @@ impl<C: EthereumRpcClient + Sync + Send> LastFinalizedBlockNumFetcher for Fetche
 }
 
 #[async_trait]
-impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, EventSourceId>
-    for Fetcher<C>
-{
-    async fn get_block_pay_in_events(
-        &mut self,
-        block_num: u64,
-    ) -> Result<Vec<PayIn<PayInEventId, EventSourceId>>, ()> {
+impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, EventSourceId> for Fetcher<C> {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, EventSourceId>>, ()> {
         let block_logs = self
             .client
-            .get_block_logs(
-                block_num,
-                Vec::from_iter(self.event_sources.clone()),
-                EVENT_TOPIC,
-            )
+            .get_block_logs(block_num, Vec::from_iter(self.event_sources.clone()), EVENT_TOPIC)
             .await?;
 
         log::debug!("Checking log details for block number: {:?}", block_num);
-        log::debug!(
-            "Checking log details for contract: {:?}",
-            self.event_sources
-        );
+        log::debug!("Checking log details for contract: {:?}", self.event_sources);
         log::debug!("Checking log details for topic: {:?}", self.event_topic);
         log::debug!("Size of the logs received via RPC: {:?}", block_logs.len());
         log::debug!("Logs in the buffer: {:?}", block_logs);
 
         let deposit_events: Vec<_> = block_logs
             .into_iter()
-            .filter(|log| {
-                self.event_sources.contains(&log.address) && log.topics.contains(&self.event_topic)
-            })
+            .filter(|log| self.event_sources.contains(&log.address) && log.topics.contains(&self.event_topic))
             .map(|log| {
                 let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
                 log::debug!("Got contract events: {:?}", event);
@@ -170,13 +151,8 @@ mod test {
         logs.insert(1, block_1_logs);
         logs.insert(2, block_2_logs);
 
-        let block_1_pay_in_events: Vec<EthereumPayInEvent> = vec![PayIn::new(
-            PayInEventId::new(1, 1, 1),
-            Some(source),
-            10,
-            1,
-            event_data,
-        )];
+        let block_1_pay_in_events: Vec<EthereumPayInEvent> =
+            vec![PayIn::new(PayInEventId::new(1, 1, 1), Some(source), 10, 1, event_data)];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
 
         pay_in_events.insert(1, block_1_pay_in_events.clone());
@@ -186,13 +162,7 @@ mod test {
         let mut fetcher = Fetcher::new(0, rpc_client, HashSet::from_iter(vec![source]));
 
         // when and then -.-
-        assert_eq!(
-            block_1_pay_in_events,
-            fetcher.get_block_pay_in_events(1).await.unwrap()
-        );
-        assert_eq!(
-            block_2_pay_in_events,
-            fetcher.get_block_pay_in_events(2).await.unwrap()
-        );
+        assert_eq!(block_1_pay_in_events, fetcher.get_block_pay_in_events(1).await.unwrap());
+        assert_eq!(block_2_pay_in_events, fetcher.get_block_pay_in_events(2).await.unwrap());
     }
 }

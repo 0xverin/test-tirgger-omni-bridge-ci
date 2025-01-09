@@ -4,9 +4,9 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-bridge-core = { path = "../../bridge-core" }
+bridge-core = { workspace = true }
 async-trait = { workspace = true }
-subxt = "0.37.0"
-subxt-signer = { version = "0.37.0", features = ["subxt"]}
-log = { workspace = true }
 serde = { workspace = true }
+subxt = { workspace = true }
+subxt-signer = { workspace = true }
+log = { workspace = true }

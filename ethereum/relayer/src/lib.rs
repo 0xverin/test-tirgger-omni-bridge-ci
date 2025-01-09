@@ -18,7 +18,7 @@ use crate::key_store::EthereumKeyStore;
 use crate::Bridge::BridgeInstance;
 use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{Address, Bytes, FixedBytes, B160, B256, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::fillers::{
     ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
@@ -50,15 +50,10 @@ pub struct RelayerConfig {
     pub bridge_contract_address: String,
 }
 
-pub fn create_from_config(config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
+pub fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
     let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
-    for relayer_config in config
-        .relayers
-        .iter()
-        .filter(|r| r.relayer_type == "ethereum")
-    {
-        let key_store =
-            EthereumKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
+    for relayer_config in config.relayers.iter().filter(|r| r.relayer_type == "ethereum") {
+        let key_store = EthereumKeyStore::new(format!("{}/{}.bin", keystore_dir, relayer_config.id));
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
         let relayer: EthereumRelayer = EthereumRelayer::new(
             &substrate_relayer_config.node_rpc_url,
@@ -91,33 +86,19 @@ pub struct EthereumRelayer {
 // TODO: We need to configure gas options
 #[allow(clippy::result_unit_err)]
 impl EthereumRelayer {
-    pub fn new(
-        rpc_url: &str,
-        bridge_address: &str,
-        key_store: EthereumKeyStore,
-    ) -> Result<Self, ()> {
-        let signer = PrivateKeySigner::from(
-            key_store
-                .read()
-                .map_err(|e| error!("Can't read key store: {:?}", e))?,
-        );
+    pub fn new(rpc_url: &str, bridge_address: &str, key_store: EthereumKeyStore) -> Result<Self, ()> {
+        let signer = PrivateKeySigner::from(key_store.read().map_err(|e| error!("Can't read key store: {:?}", e))?);
 
-        log::debug!("The address of the local signer: {:?}", signer.address());
+        log::info!("The address of the local signer: {:?}", signer.address());
 
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(
-                rpc_url
-                    .parse()
-                    .map_err(|_| error!("Could not parse rpc url"))?,
-            );
+            .on_http(rpc_url.parse().map_err(|_| error!("Could not parse rpc url"))?);
 
         let bridge_instance = Bridge::new(
-            Address::from_slice(
-                &decode(bridge_address).map_err(|_| error!("Can't decode bridge address"))?,
-            ),
+            Address::from_slice(&decode(bridge_address).map_err(|_| error!("Can't decode bridge address"))?),
             provider,
         );
 
@@ -125,11 +106,7 @@ impl EthereumRelayer {
     }
 
     pub fn get_address(&self) -> Address {
-        self.bridge_instance
-            .provider()
-            .signer_addresses()
-            .next()
-            .unwrap()
+        self.bridge_instance.provider().signer_addresses().next().unwrap()
     }
 }
 

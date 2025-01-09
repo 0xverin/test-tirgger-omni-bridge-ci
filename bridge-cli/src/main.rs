@@ -42,10 +42,10 @@ async fn main() -> Result<(), ()> {
     match &cli.command {
         Some(Command::Ethereum(ethereum_command)) => {
             ethereum_cli::handle(ethereum_command).await;
-        }
+        },
         Some(Command::Substrate(substrate_command)) => {
             substrate_cli::handle(substrate_command).await;
-        }
+        },
         _ => println!("No command specified!"),
     }
 
