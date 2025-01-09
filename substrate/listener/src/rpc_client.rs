@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 use subxt::backend::legacy::LegacyRpcMethods;
 use subxt::backend::BlockRef;
 use subxt::config::Header;
-use subxt::events::{EventsClient, StaticEvent};
+use subxt::events::EventsClient;
 use subxt::{Config, OnlineClient};
 
 pub struct BlockEvent<T> {
@@ -34,7 +34,12 @@ impl<T> BlockEvent<T> {
     }
 }
 
-pub struct PayInEvent {}
+pub struct PaidInEvent {
+    pub amount: u128,
+    pub nonce: u64,
+    pub resource_id: [u8; 32],
+    pub data: Vec<u8>,
+}
 
 /// For fetching data from Substrate RPC node
 #[async_trait]
@@ -43,21 +48,18 @@ pub trait SubstrateRpcClient {
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()>;
+    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()>;
 }
 
-pub struct RpcClient<ChainConfig: Config, PayInEventType: StaticEvent> {
+pub struct RpcClient<ChainConfig: Config> {
     legacy: LegacyRpcMethods<ChainConfig>,
     events: EventsClient<ChainConfig, OnlineClient<ChainConfig>>,
-    _phantom: PhantomData<PayInEventType>,
 }
 
-impl<ChainConfig: Config, PayInEventType: StaticEvent> RpcClient<ChainConfig, PayInEventType> {}
+impl<ChainConfig: Config> RpcClient<ChainConfig> {}
 
 #[async_trait]
-impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRpcClient
-    for RpcClient<ChainConfig, PayInEventType>
-{
+impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()> {
         let finalized_header = self
             .legacy
@@ -77,7 +79,7 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
     async fn get_block_pay_in_events(
         &mut self,
         block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
+    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
         match self
             .legacy
             .chain_get_block_hash(Some(block_num.into()))
@@ -91,12 +93,23 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send> SubstrateRp
                     .await
                     .map_err(|_| ())?;
 
-                let pay_in_events = events.find::<PayInEventType>();
+                let pay_in_events =
+                    events.find::<crate::litentry_rococo::omni_bridge::events::PaidIn>();
 
                 Ok(pay_in_events
                     .enumerate()
-                    .map(|(i, _event)| {
-                        BlockEvent::new(EventId::new(block_num, i as u64), PayInEvent {})
+                    .map(|(i, event)| {
+                        let event: crate::litentry_rococo::omni_bridge::events::PaidIn =
+                            event.unwrap();
+                        BlockEvent::new(
+                            EventId::new(block_num, i as u64),
+                            PaidInEvent {
+                                amount: event.amount,
+                                resource_id: event.resource_id,
+                                data: event.dest_account,
+                                nonce: event.nonce,
+                            },
+                        )
                     })
                     .collect())
             }
@@ -123,7 +136,7 @@ impl SubstrateRpcClient for MockedRpcClient {
     async fn get_block_pay_in_events(
         &mut self,
         _block_num: u64,
-    ) -> Result<Vec<BlockEvent<PayInEvent>>, ()> {
+    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
         Ok(vec![])
     }
 }
@@ -133,14 +146,12 @@ pub trait SubstrateRpcClientFactory<RpcClient: SubstrateRpcClient> {
     async fn new_client(&self) -> Result<RpcClient, ()>;
 }
 
-pub struct RpcClientFactory<ChainConfig: Config, PayInEventType: StaticEvent> {
+pub struct RpcClientFactory<ChainConfig: Config> {
     url: String,
-    _phantom: PhantomData<(ChainConfig, PayInEventType)>,
+    _phantom: PhantomData<ChainConfig>,
 }
 
-impl<ChainConfig: Config, PayInEventType: StaticEvent>
-    RpcClientFactory<ChainConfig, PayInEventType>
-{
+impl<ChainConfig: Config> RpcClientFactory<ChainConfig> {
     pub fn new(url: &str) -> Self {
         Self {
             url: url.to_string(),
@@ -150,11 +161,10 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent>
 }
 
 #[async_trait]
-impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send>
-    SubstrateRpcClientFactory<RpcClient<ChainConfig, PayInEventType>>
-    for RpcClientFactory<ChainConfig, PayInEventType>
+impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>>
+    for RpcClientFactory<ChainConfig>
 {
-    async fn new_client(&self) -> Result<RpcClient<ChainConfig, PayInEventType>, ()> {
+    async fn new_client(&self) -> Result<RpcClient<ChainConfig>, ()> {
         let rpc_client = subxt::backend::rpc::RpcClient::from_insecure_url(self.url.clone())
             .await
             .map_err(|e| {
@@ -169,10 +179,6 @@ impl<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send>
             })?;
         let events = online_client.events();
 
-        Ok(RpcClient {
-            legacy,
-            events,
-            _phantom: PhantomData,
-        })
+        Ok(RpcClient { legacy, events })
     }
 }

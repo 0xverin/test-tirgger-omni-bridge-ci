@@ -106,10 +106,7 @@ async fn sync_litentry_rococo(
 
     let relayer: Box<dyn Relayer> = context.relayers.remove(0);
 
-    let mut substrate_listener = substrate_listener::create_listener::<
-        CustomConfig,
-        substrate_listener::litentry_rococo::chain_bridge::events::FungibleTransfer,
-    >(
+    let mut substrate_listener = substrate_listener::create_listener::<CustomConfig>(
         &context.id,
         Handle::current(),
         &context.config,

@@ -1139,7 +1139,6 @@ dependencies = [
  "env_logger",
  "ethereum-listener",
  "ethereum-relayer",
- "hex",
  "log",
  "serde",
  "serde_json",
@@ -1747,6 +1746,7 @@ dependencies = [
  "alloy",
  "clap",
  "log",
+ "serde_json",
  "subxt-core 0.38.0",
 ]
 

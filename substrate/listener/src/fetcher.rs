@@ -17,7 +17,7 @@
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use bridge_core::listener::PayIn;
-use log::error;
+use log::{debug, error};
 
 use crate::rpc_client::SubstrateRpcClientFactory;
 use crate::{listener::PayInEventId, rpc_client::SubstrateRpcClient};
@@ -88,7 +88,16 @@ impl<
                 .map(|events| {
                     events
                         .into_iter()
-                        .map(|event| PayIn::new(event.id, None, 0, 0, vec![]))
+                        .map(|event| {
+                            PayIn::new(
+                                event.id,
+                                None,
+                                event.event.amount,
+                                event.event.nonce,
+                                event.event.resource_id,
+                                event.event.data,
+                            )
+                        })
                         .collect()
                 })
         } else {

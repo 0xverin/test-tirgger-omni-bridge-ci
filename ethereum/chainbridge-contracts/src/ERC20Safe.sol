@@ -46,7 +46,6 @@ contract ERC20Safe {
     function mintERC20(address tokenAddress, address recipient, uint256 amount) internal {
         ERC20PresetMinterPauser erc20 = ERC20PresetMinterPauser(tokenAddress);
         erc20.mint(recipient, amount);
-
     }
 
     /**

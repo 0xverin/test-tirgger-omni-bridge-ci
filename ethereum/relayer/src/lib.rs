@@ -18,7 +18,7 @@ use crate::key_store::EthereumKeyStore;
 use crate::Bridge::BridgeInstance;
 use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::Address;
+use alloy::primitives::{Address, Bytes, FixedBytes, B160, B256, U256};
 use alloy::providers::fillers::{
     ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
@@ -33,6 +33,7 @@ use bridge_core::relay::Relayer;
 use log::{debug, error};
 use serde::Deserialize;
 use std::collections::HashMap;
+use alloy::dyn_abi::DynSolValue;
 
 pub mod key_store;
 
@@ -69,7 +70,6 @@ pub fn create_from_config(config: &BridgeConfig) -> HashMap<String, Box<dyn Rela
     }
     relayers
 }
-
 
 /// Relays bridge request to smart contracts deployed on ethereum based network.
 #[allow(clippy::type_complexity)]
@@ -135,65 +135,53 @@ impl EthereumRelayer {
 
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(&self, amount: u128, nonce: u64, _data: Vec<u8>) -> Result<(), ()> {
-        debug!("Relaying amount: {} with nonce: {}", amount, nonce);
+    async fn relay(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        data: Vec<u8>,
+    ) -> Result<(), ()> {
+        debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
 
-        // if let ChainEvents::SubstrateWithdrawEvent(transfer_fungible) = data {
-        //     let transfer = transfer_fungible.clone();
-        //     let (destination_chain_id, nonce, resource_id, amount, recipient) = transfer_fungible.create_vote_proposal_args();
-        //     let (proposal_call_data, proposal_hash) = TransferFungible::create_call_data_and_hash(amount, recipient);
-        //
-        //     let proposal_builder = self.bridge_instance.voteProposal(
-        //         transfer.bridge_chain_id,
-        //         transfer.deposit_nonce,
-        //         resource_id.into(),
-        //         proposal_hash.into()
-        //     );
-        //
-        //     proposal_builder
-        //         .send()
-        //         .await
-        //         .map_err(|e| {
-        //             error!("Error while sending tx: {:?}", e);
-        //         })?
-        //         .watch()
-        //         .await
-        //         .map_err(|e| {
-        //             error!("Error while watching tx: {:?}", e);
-        //         })?;
-        //
-        //     log::info!("Succesfully submitted voteProposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
-        //
-        //     // We should also execute the proposal
-        //     let proposal_executer = self.bridge_instance.executeProposal(
-        //         transfer.bridge_chain_id,
-        //         transfer.deposit_nonce,
-        //         proposal_call_data.into(),
-        //         resource_id.into(),
-        //         // todo: false or true ?
-        //         false
-        //     );
-        //
-        //     log::info!("Waiting for the proposal to pass...");
-        //     // Sleeping before the proposal passes
-        //     sleep(Duration::from_secs(2));
-        //
-        //     proposal_executer
-        //         .send()
-        //         .await
-        //         .map_err(|e| {
-        //             error!("Error while sending tx: {:?}", e);
-        //         })?
-        //         .watch()
-        //         .await
-        //         .map_err(|e| {
-        //             error!("Error while watching tx: {:?}", e);
-        //         })?;
-        //
-        //     log::info!("Succesfully executed Proposal for resource_id: {:?}, amount: {:?}, recipient: {:?}", resource_id, amount, recipient);
-        //
-        //
-        // }
+        // resource id 0
+        let resource_id = FixedBytes::new(resource_id);
+
+
+        let amount = DynSolValue::Uint(U256::from(amount), 32).abi_encode();
+        let address_len = DynSolValue::Uint(U256::from(data.len()), 32).abi_encode();
+
+        let mut address_bytes = [0; 32];
+        address_bytes[0..20].copy_from_slice(&data);
+
+        let address = DynSolValue::FixedBytes(FixedBytes(address_bytes), 32).abi_encode();
+
+        debug!("Address bytes: {:?}", address);
+
+        let mut bytes = vec![];
+
+        bytes.extend(amount);
+        bytes.extend(address_len);
+        bytes.extend(address);
+
+        let call_data = Bytes::copy_from_slice(&bytes);
+
+        debug!("Call data: {:?}", call_data);
+
+
+        // domainId 0 - heima
+        let proposal_builder = self
+            .bridge_instance
+            .voteProposal(0, nonce, resource_id, call_data);
+
+        proposal_builder
+            .send()
+            .await
+            .unwrap()
+            .watch()
+            .await
+            .unwrap();
+        debug!("Proposal relayed");
         Ok(())
     }
 }

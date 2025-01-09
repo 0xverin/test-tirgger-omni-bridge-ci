@@ -29,7 +29,13 @@ pub enum Relay<Id> {
 /// Used to relay bridging request to destination chain
 #[async_trait]
 pub trait Relayer: Send {
-    async fn relay(&self, amount: u128, nonce: u64, data: Vec<u8>) -> Result<(), ()>;
+    async fn relay(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        data: Vec<u8>,
+    ) -> Result<(), ()>;
 }
 
 #[allow(dead_code)]
@@ -46,7 +52,13 @@ impl MockRelayer {
 
 #[async_trait]
 impl Relayer for MockRelayer {
-    async fn relay(&self, _amount: u128, _nonce: u64, _data: Vec<u8>) -> Result<(), ()> {
+    async fn relay(
+        &self,
+        _amount: u128,
+        _nonce: u64,
+        _resource_id: [u8; 32],
+        _data: Vec<u8>,
+    ) -> Result<(), ()> {
         self.sender.send(()).map_err(|_| ())
     }
 }

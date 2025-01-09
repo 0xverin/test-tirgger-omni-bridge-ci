@@ -8,4 +8,4 @@ clap = { workspace = true, features = ["derive"] }
 subxt = "0.37.0"
 subxt-signer = { version = "0.37.0", features = ["subxt"] }
 log = { workspace = true }
-hex = "0.4"
+hex = { workspace = true }

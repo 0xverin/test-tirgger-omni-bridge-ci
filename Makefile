@@ -83,4 +83,4 @@ build-evm-contracts:
 
 .PHONY: get-bridge-pallet-metadata
 get-bridge-pallet-metadata:
-	subxt metadata --url http://localhost:9944 --allow-insecure --pallets PalletBridge > substrate/artifacts/rococo-bridge.scale
+	subxt metadata --url http://localhost:9944 --allow-insecure --pallets OmniBridge,Sudo,System > substrate/artifacts/rococo-bridge.scale

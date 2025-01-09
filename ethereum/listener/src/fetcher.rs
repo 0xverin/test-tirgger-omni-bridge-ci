@@ -104,6 +104,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
             .map(|log| {
                 let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
                 log::debug!("Got contract events: {:?}", event);
+                let resource_id = event.1;
                 let nonce = event.2;
                 let data = event.3;
 
@@ -115,6 +116,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                     Some(log.address),
                     amount.try_into().unwrap(),
                     nonce,
+                    resource_id.0,
                     data.into(),
                 )
             })

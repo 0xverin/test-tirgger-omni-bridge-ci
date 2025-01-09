@@ -36,7 +36,7 @@ impl EthereumKeyStore {
 impl KeyStore<SigningKey> for EthereumKeyStore {
     fn generate_key() -> Result<SigningKey, ()> {
         SigningKey::from_slice(
-            &decode("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap(),
+            &decode("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").unwrap(),
         )
         .map_err(|_| ())
     }

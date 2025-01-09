@@ -17,19 +17,20 @@
 use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
 use bridge_core::config::BridgeConfig;
+use bridge_core::key_store::KeyStore;
 use bridge_core::relay::Relayer;
-use log::debug;
+use log::{debug, error};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use subxt::utils::AccountId32;
-use subxt::{Config, PolkadotConfig};
+use subxt::{Config, OnlineClient, PolkadotConfig};
 use subxt_signer::bip39::serde;
 
 pub mod key_store;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/metadata.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
 pub mod litentry_rococo {}
 
 pub type CONF = PolkadotConfig;
@@ -39,10 +40,10 @@ pub struct RelayerConfig {
     pub ws_rpc_endpoint: String,
 }
 
-/// Relays bridge request to substrate node's runtime pallet.
+/// Relays bridge request to substrate node's OmniBridge pallet.
 pub struct SubstrateRelayer<T: Config> {
-    _rpc_url: String,
-    _key_store: SubstrateKeyStore,
+    rpc_url: String,
+    key_store: SubstrateKeyStore,
     _phantom: PhantomData<T>,
 }
 
@@ -55,6 +56,18 @@ pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, B
     {
         let key_store =
             SubstrateKeyStore::new(format!("data/{}_relayer_key.bin", relayer_config.id));
+
+        let signer = subxt_signer::sr25519::Keypair::from_secret_key(key_store.read().unwrap())
+            .map_err(|e| {
+                error!("Could not create secret key: {:?}", e);
+            })
+            .unwrap();
+
+        debug!(
+            "The address of the local signer: {}",
+            signer.public_key().to_account_id()
+        );
+
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
         let relayer: SubstrateRelayer<T> =
             SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
@@ -67,8 +80,8 @@ pub fn create_from_config<T: Config>(config: &BridgeConfig) -> HashMap<String, B
 impl<T: Config> SubstrateRelayer<T> {
     pub fn new(rpc_url: &str, key_store: SubstrateKeyStore) -> Self {
         Self {
-            _rpc_url: rpc_url.to_string(),
-            _key_store: key_store,
+            rpc_url: rpc_url.to_string(),
+            key_store,
             _phantom: PhantomData,
         }
     }
@@ -76,7 +89,13 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, amount: u128, nonce: u64, _data: Vec<u8>) -> Result<(), ()> {
+    async fn relay(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        _data: Vec<u8>,
+    ) -> Result<(), ()> {
         let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
         let account: AccountId32 = AccountId32::from(account_bytes);
         debug!(
@@ -84,50 +103,45 @@ impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
             amount, nonce, account
         );
 
-        //parse account id
+        let request = litentry_rococo::runtime_types::pallet_omni_bridge::PayOutRequest {
+            //todo: should not be hardcoded
+            source_chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(
+                0,
+            ),
+            nonce,
+            resource_id,
+            dest_account: account,
+            amount,
+        };
 
-        // let (amount, rid, to, nonce) = data.get_bridge_transfer_arguments().unwrap();
-        //
-        // log::debug!("Submitting bridge_transfer extrinsic, amount: {:?}, to: {:?}", amount, to);
-        //
-        // let bridge = RuntimeCall::BridgeTransfer (
-        //     Call::transfer{to, amount, rid: rid.clone()},
-        // );
-        //
-        // let call = litentry_rococo::tx()
-        //     .chain_bridge()
-        //     .acknowledge_proposal(nonce, 0, rid, bridge);
-        //
-        // let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
-        //     .await
-        //     .map_err(|e| {
-        //         error!("Could not connect to node: {:?}", e);
-        //     })?;
-        // let secret_key_bytes = self.key_store.read().map_err(|e| {
-        //     error!("Could not unseal key: {:?}", e);
-        // })?;
-        // let signer =
-        //     subxt_signer::sr25519::Keypair::from_secret_key(secret_key_bytes).map_err(|e| {
-        //         error!("Could not create secret key: {:?}", e);
-        //     })?;
-        //
-        // let alice_signer = dev::alice();
-        //
-        // // TODO: This should be submit and watch
-        // let hash = api
-        //     .tx()
-        //     .sign_and_submit(&call, &alice_signer, Default::default())
-        //     .await
-        //     .map_err(|e| {
-        //         error!("Could not submit tx: {:?}", e);
-        //     });
-        //
-        // // Note: Hash doesn't guranttee success of extrinsic
-        // if let Ok(hash_of) = hash {
-        //     log::debug!("Submtted extrinsic succesfully: {:?}", hash_of);
-        // } else {
-        //     log::error!("Failed to submit extrinsics succesfully");
-        // }
+        let call = litentry_rococo::tx()
+            .omni_bridge()
+            .request_pay_out(request, true);
+
+        log::debug!("Submitting PayOutRequest extrinsic: {:?}", call);
+
+        let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)
+            .await
+            .map_err(|e| {
+                error!("Could not connect to node: {:?}", e);
+            })?;
+        let secret_key_bytes = self.key_store.read().map_err(|e| {
+            error!("Could not unseal key: {:?}", e);
+        })?;
+        let signer =
+            subxt_signer::sr25519::Keypair::from_secret_key(secret_key_bytes).map_err(|e| {
+                error!("Could not create secret key: {:?}", e);
+            })?;
+
+        let hash = api
+            .tx()
+            .sign_and_submit(&call, &signer, Default::default())
+            .await
+            .map_err(|e| {
+                error!("Could not submit tx: {:?}", e);
+            });
+
+        debug!("Relayed pay out request with hash: {:?}", hash);
 
         Ok(())
     }

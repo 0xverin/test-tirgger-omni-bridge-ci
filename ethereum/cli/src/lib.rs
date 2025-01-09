@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use alloy::contract::{ContractInstance, Interface};
 // Copyright 2020-2024 Trust Computing GmbH.
 // This file is part of Litentry.
 //
@@ -36,6 +37,14 @@ pub enum EthereumCommand {
     Bridge(BridgeCmdConf),
     AddRelayer(AddRelayerCmdConf),
     SetupBridge(SetupBridgeCmdConf),
+    QueryERC20Amount(QueryERC20AmountCmdConf)
+}
+#[derive(Args)]
+pub struct QueryERC20AmountCmdConf {
+    #[clap(default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
+    token_address: String,
+    #[clap(default_value = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8")]
+    account: String
 }
 
 #[derive(Args)]
@@ -71,6 +80,7 @@ pub struct SetupBridgeCmdConf {
 
 #[derive(Args)]
 pub struct AddRelayerCmdConf {
+    #[clap(default_value = "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc")]
     relayer_address: String,
     #[clap(default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
     bridge_private_key: String,
@@ -178,6 +188,10 @@ pub async fn handle(command: &EthereumCommand) {
                 rpc_url,
             )
             .await;
+        },
+        EthereumCommand::QueryERC20Amount(conf) => {
+            let address = Address::from_str(&conf.account).unwrap();
+            query_hei_token_amount(address, &conf.token_address, rpc_url).await;
         }
     }
 }
@@ -222,6 +236,27 @@ async fn wrap_to(
         .watch()
         .await
         .unwrap();
+}
+
+async fn query_hei_token_amount(
+    address: Address,
+    hei_token_address: &str,
+    rpc_url: &str
+) {
+    info!("Querying hei token amount on address {}", address);
+    let provider = ProviderBuilder::new().with_recommended_fillers().on_http(rpc_url.parse().unwrap());
+
+    let artifact = include_str!("../artifacts/HEI.json");
+    let json: serde_json::Value = serde_json::from_str(artifact).unwrap();
+
+    let abi_value = json.get("abi").expect("Failed to get ABI from artifact");
+    let abi = serde_json::from_str(&abi_value.to_string()).unwrap();
+
+    let contract_instance = ContractInstance::new(Address::from_str(hei_token_address).unwrap(), provider, Interface::new(abi));
+
+
+    let balance = contract_instance.function("balanceOf", &[DynSolValue::Address(address)]).unwrap().call().await.unwrap();
+    info!("Balance of {} is {:?}", address, balance);
 }
 
 async fn approve_lit_to(
@@ -270,7 +305,7 @@ async fn setup_bridge(
 ) {
     info!("Setting up bridge");
     let bridge_instance = bridge_instance(bridge_address, by_private_key, rpc_url).await;
-    let resource_id = FixedBytes([0; 32]);
+    let resource_id = FixedBytes([158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223, 138, 246, 22, 42, 177, 69, 166]);
 
     let builder = bridge_instance.adminSetResource(
         Address::from_hex(bridge_erc20_handler_address).unwrap(),
@@ -283,6 +318,13 @@ async fn setup_bridge(
         Address::from_hex(hei_token_address).unwrap(),
     );
     builder_2.send().await.unwrap().watch().await.unwrap();
+
+    info!("Adding MINTER role to ERC20Handler on HEI contract instance");
+    let hei_instance = hei_token_instance(hei_token_address, by_private_key, rpc_url).await;
+    hei_instance.grantMinter(Address::from_hex(bridge_erc20_handler_address).unwrap()).send().await.unwrap().watch().await.unwrap();
+
+
+
 }
 
 async fn bridge_deposit(
@@ -294,7 +336,7 @@ async fn bridge_deposit(
 ) {
     info!("Bridging deposit");
     let bridge_instance = bridge_instance(bridge_address, by_private_key, rpc_url).await;
-    let resource_id = FixedBytes([0; 32]);
+    let resource_id = FixedBytes([158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223, 138, 246, 22, 42, 177, 69, 166]);
     // 0x + amount + address len + address (all 32 bytes padded)
     let amount = DynSolValue::Uint(U256::from_str_radix(amount, 10).unwrap(), 32).abi_encode();
     let account_id = AccountId32::from_str(account.as_str()).unwrap();

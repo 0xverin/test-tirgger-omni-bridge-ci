@@ -27,13 +27,12 @@ use bridge_core::relay::{Relay, Relayer};
 use bridge_core::sync_checkpoint_repository::FileCheckpointRepository;
 use scale_encode::EncodeAsType;
 use subxt::config::signed_extensions;
-use subxt::events::StaticEvent;
 use subxt::Config;
 use tokio::runtime::Handle;
 use tokio::sync::oneshot::Receiver;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/metadata.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
 pub mod litentry_rococo {}
 
 // We don't need to construct this at runtime,
@@ -67,7 +66,7 @@ impl Config for CustomConfig {
 }
 
 /// Creates substrate based chain listener.
-pub async fn create_listener<ChainConfig: Config, PayInEventType: StaticEvent + Sync + Send>(
+pub async fn create_listener<ChainConfig: Config>(
     id: &str,
     handle: Handle,
     config: &ListenerConfig,
@@ -75,13 +74,13 @@ pub async fn create_listener<ChainConfig: Config, PayInEventType: StaticEvent + 
     stop_signal: Receiver<()>,
 ) -> Result<
     SubstrateListener<
-        RpcClient<ChainConfig, PayInEventType>,
-        RpcClientFactory<ChainConfig, PayInEventType>,
+        RpcClient<ChainConfig>,
+        RpcClientFactory<ChainConfig>,
         FileCheckpointRepository,
     >,
     (),
 > {
-    let client_factory: RpcClientFactory<ChainConfig, PayInEventType> =
+    let client_factory: RpcClientFactory<ChainConfig> =
         RpcClientFactory::new(&config.ws_rpc_endpoint);
 
     let fetcher = Fetcher::new(client_factory);

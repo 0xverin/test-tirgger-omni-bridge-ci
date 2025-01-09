@@ -33,6 +33,7 @@ pub struct PayIn<Id: Clone, EventSourceId: Clone> {
     maybe_event_source: Option<EventSourceId>,
     amount: u128,
     nonce: u64,
+    resource_id: [u8; 32],
     data: Vec<u8>,
 }
 
@@ -42,6 +43,7 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
         maybe_event_source: Option<EventSourceId>,
         amount: u128,
         nonce: u64,
+        resource_id: [u8; 32],
         data: Vec<u8>,
     ) -> Self {
         Self {
@@ -49,6 +51,7 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
             maybe_event_source,
             amount,
             nonce,
+            resource_id,
             data,
         }
     }
@@ -229,6 +232,7 @@ impl<
                                         .block_on(relayer.relay(
                                             event.amount,
                                             event.nonce,
+                                            event.resource_id,
                                             event.data,
                                         ))
                                         .is_err()
@@ -242,7 +246,12 @@ impl<
                                 }
                             } else if self
                                 .handle
-                                .block_on(relayer.relay(event.amount, event.nonce, event.data))
+                                .block_on(relayer.relay(
+                                    event.amount,
+                                    event.nonce,
+                                    event.resource_id,
+                                    event.data,
+                                ))
                                 .is_err()
                             {
                                 log::info!("Could not relay");
