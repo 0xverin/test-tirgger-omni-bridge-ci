@@ -20,7 +20,13 @@ edition = "2021"
 log = "0.4.22"
 sha2 = "0.10.8"
 thiserror = "2.0"
-tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "signal"] }
+tokio = { version = "1.40", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "signal",
+    "sync",
+] }
 async-trait = "0.1.82"
 env_logger = "0.11.5"
 scale-encode = "0.7"

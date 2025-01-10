@@ -46,14 +46,7 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
         resource_id: [u8; 32],
         data: Vec<u8>,
     ) -> Self {
-        Self {
-            id,
-            maybe_event_source,
-            amount,
-            nonce,
-            resource_id,
-            data,
-        }
+        Self { id, maybe_event_source, amount, nonce, resource_id, data }
     }
 }
 
@@ -101,6 +94,7 @@ pub struct Listener<EventSourceId, Fetcher, Checkpoint, CheckpointRepository, Pa
     relay: Relay<EventSourceId>,
     stop_signal: Receiver<()>,
     checkpoint_repository: CheckpointRepository,
+    start_block: u64,
     _phantom: PhantomData<(Checkpoint, PayInEventId)>,
 }
 
@@ -120,6 +114,7 @@ impl<
         relay: Relay<EventSourceId>,
         stop_signal: Receiver<()>,
         last_processed_log_repository: CheckpointRepositoryT,
+        start_block: u64,
     ) -> Result<Self, ()> {
         Ok(Self {
             id: id.to_string(),
@@ -128,25 +123,31 @@ impl<
             relay,
             stop_signal,
             checkpoint_repository: last_processed_log_repository,
+            start_block,
             _phantom: PhantomData,
         })
     }
 
     /// Start syncing. It's a long-running blocking operation - should be started in dedicated thread.
-    pub fn sync(&mut self, start_block: u64) {
-        log::info!("Starting {} network sync, start block: {}", self.id, start_block);
+    pub fn sync(&mut self) {
+        log::info!("Starting {} network sync, start block: {}", self.id, self.start_block);
         let mut block_number_to_sync =
             if let Some(ref checkpoint) = self.checkpoint_repository.get().expect("Could not read checkpoint") {
-                if checkpoint.just_block_num() {
-                    // let's start syncing from next block as we processed previous fully
-                    checkpoint.get_block_num() + 1
+                let last_block_num = checkpoint.get_block_num();
+
+                // Ensure `start_block` overrides only if it's valid
+                if self.start_block > last_block_num {
+                    self.start_block
+                } else if checkpoint.just_block_num() {
+                    // Start syncing from the next block as we processed the previous one fully
+                    last_block_num + 1
                 } else {
-                    // block processing was interrupted, so we have to process last block again
-                    // but currently processed logs will be skipped
-                    checkpoint.get_block_num()
+                    // Reprocess the last block if interrupted
+                    last_block_num
                 }
             } else {
-                start_block
+                // Default to start_block if no checkpoint exists
+                self.start_block
             };
         log::debug!("Starting sync from {:?}", block_number_to_sync);
 
@@ -220,12 +221,7 @@ impl<
                                 }
                             } else if self
                                 .handle
-                                .block_on(relayer.relay(
-                                    event.amount,
-                                    event.nonce,
-                                    event.resource_id,
-                                    event.data,
-                                ))
+                                .block_on(relayer.relay(event.amount, event.nonce, event.resource_id, event.data))
                                 .is_err()
                             {
                                 log::info!("Could not relay");

@@ -28,6 +28,7 @@ pub type EthereumPayInEvent = PayIn<PayInEventId, EventSourceId>;
 pub struct ListenerConfig {
     pub node_rpc_url: String,
     pub bridge_contract_address: String,
+    pub start_block: u64,
 }
 
 pub type EthereumListener<RpcClient, CheckpointRepository> =
@@ -109,10 +110,11 @@ pub mod tests {
                 Relay::Multi(relay_map),
                 stop_receiver,
                 InMemoryCheckpointRepository::new(None),
+                start_block,
             )
             .unwrap();
 
-        let _handle = thread::spawn(move || listener.sync(start_block));
+        let _handle = thread::spawn(move || listener.sync());
 
         assert_relay_count(&mut receiver, 1).await;
         stop_sender.send(()).unwrap();
@@ -201,10 +203,11 @@ pub mod tests {
                 Relay::Multi(relay_map),
                 stop_receiver,
                 InMemoryCheckpointRepository::new(Some(SyncCheckpoint::new(2, Some(1), Some(2)))),
+                start_block,
             )
             .unwrap();
 
-        let _handle = thread::spawn(move || listener.sync(start_block));
+        let _handle = thread::spawn(move || listener.sync());
 
         assert_relay_count(&mut receiver, 1).await;
 

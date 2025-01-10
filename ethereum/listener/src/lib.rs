@@ -57,9 +57,16 @@ pub fn create_listener(
         HashSet::from([Address::from_str(&config.bridge_contract_address).unwrap()]),
     );
 
-    let ethereum_listener: EthereumListener<EthersRpcClient, FileCheckpointRepository> =
-        Listener::new(id, handle, fetcher, relay::Relay::Single(relays), stop_signal, last_processed_log_repository)
-            .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
+    let ethereum_listener: EthereumListener<EthersRpcClient, FileCheckpointRepository> = Listener::new(
+        id,
+        handle,
+        fetcher,
+        relay::Relay::Single(relays),
+        stop_signal,
+        last_processed_log_repository,
+        config.start_block,
+    )
+    .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
 
     Ok(ethereum_listener)
 }

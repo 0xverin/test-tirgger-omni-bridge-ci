@@ -29,4 +29,5 @@ pub type SubstrateListener<RpcClient, RpcClientFactory, CheckpointRepository> =
 #[derive(Deserialize)]
 pub struct ListenerConfig {
     pub ws_rpc_endpoint: String,
+    pub start_block: u64,
 }

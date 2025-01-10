@@ -15,9 +15,9 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::cli::*;
+use crate::keystore::LocalKeystore;
 use crate::rpc::methods::{ImportRelayerKeyPayload, SignedParams};
 use crate::shielding_key::ShieldingKey;
-use crate::keystore::LocalKeystore;
 
 use bridge_core::config::BridgeConfig;
 use bridge_core::listener::{prepare_listener_context, ListenerContext};
@@ -30,18 +30,21 @@ use log::*;
 use rand::rngs::OsRng;
 use rand::Rng;
 use rpc::server::start_server;
-use rsa::{BigUint, Oaep, RsaPublicKey};
 use rsa::traits::PublicKeyParts;
+use rsa::{BigUint, Oaep, RsaPublicKey};
 use serde_json::value::RawValue;
 use sha2::Sha256;
 use sp_core::{keccak_256, ByteArray, Pair};
 use std::collections::HashMap;
 use std::thread::JoinHandle;
 use std::{fs, io::Write};
-use std::{sync::{Arc, RwLock}, thread};
+use std::{
+    sync::{Arc, RwLock},
+    thread,
+};
 use substrate_listener::listener::ListenerConfig as SubstrateListenerConfig;
 use substrate_listener::CustomConfig;
-use tokio::{runtime::Handle, sync::oneshot, signal};
+use tokio::{runtime::Handle, signal, sync::oneshot};
 
 mod cli;
 mod keystore;
@@ -99,7 +102,8 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
     relayers.insert("substrate".to_string(), substrate_relayers);
 
     // ethereum relayers
-    let ethereum_relayers: HashMap<String, Box<dyn Relayer>> = ethereum_relayer::create_from_config(keystore_dir, &config);
+    let ethereum_relayers: HashMap<String, Box<dyn Relayer>> =
+        ethereum_relayer::create_from_config(keystore_dir, &config);
     relayers.insert("ethereum".to_string(), ethereum_relayers);
 
     // start ethereum listeners
@@ -169,7 +173,7 @@ async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConf
 
     Ok(thread::Builder::new()
         .name(format!("{}_sync", &context.id).to_string())
-        .spawn(move || substrate_listener.sync(0))
+        .spawn(move || substrate_listener.sync())
         .unwrap())
 }
 
@@ -192,7 +196,7 @@ fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result
 
     Ok(thread::Builder::new()
         .name(context.id.to_string())
-        .spawn(move || eth_listener.sync(0))
+        .spawn(move || eth_listener.sync())
         .unwrap())
 }
 
@@ -232,11 +236,10 @@ async fn await_import(arg: &AwaitImportArgs) {
         .unwrap()
     );
 
-    let import_keystore_signer: [u8; 33] =
-        hex::decode(fs::read(&arg.auth_pub_key_path).unwrap())
-            .unwrap()
-            .try_into()
-            .unwrap();
+    let import_keystore_signer: [u8; 33] = hex::decode(fs::read(&arg.auth_pub_key_path).unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
     let keystore = Arc::new(RwLock::new(LocalKeystore::open(arg.keystore_dir.clone().into()).unwrap()));
 
     println!("Start server and wait for keystore import ...");
