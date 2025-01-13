@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use alloy::contract::{ContractInstance, Interface};
+use std::str::FromStr;
 // Copyright 2020-2024 Trust Computing GmbH.
 // This file is part of Litentry.
 //
@@ -32,57 +32,60 @@ use subxt_core::utils::AccountId32;
 
 #[derive(Subcommand)]
 pub enum EthereumCommand {
-    Bridge(BridgeCmdConf),
-    AddRelayer(AddRelayerCmdConf),
     SetupBridge(SetupBridgeCmdConf),
-    QueryERC20Amount(QueryERC20AmountCmdConf)
+    AddRelayer(AddRelayerCmdConf),
+    PayIn(PayInCmdConf),
+    Balance(BalanceCmdConf),
 }
+
 #[derive(Args)]
-pub struct QueryERC20AmountCmdConf {
-    #[clap(default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
+pub struct BalanceCmdConf {
+    #[arg(long, default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
     token_address: String,
-    #[clap(default_value = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8")]
-    account: String
+    #[arg(long, default_value = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8")]
+    account: String,
 }
 
 #[derive(Args)]
 // default values works for docker-compose setup
-pub struct BridgeCmdConf {
+pub struct PayInCmdConf {
+    #[arg(long, default_value = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")]
+    dest_address: String,
+    #[arg(long, default_value = "100000000000000000000")]
     amount: String,
-    to: String,
-    #[clap(default_value = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")]
+    #[arg(long, default_value = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")]
     user_private_key: String,
-    #[clap(default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
+    #[arg(long, default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
     bridge_private_key: String,
-    #[clap(default_value = "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9")]
+    #[arg(long, default_value = "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9")]
     lit_token_address: String,
-    #[clap(default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
+    #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
     bridge_address: String,
-    #[clap(default_value = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")]
+    #[arg(long, default_value = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")]
     bridge_erc20_handler_address: String,
-    #[clap(default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
+    #[arg(long, default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
     hei_token_address: String,
 }
 
 #[derive(Args)]
 pub struct SetupBridgeCmdConf {
-    #[clap(default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
+    #[arg(long, default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
     bridge_private_key: String,
-    #[clap(default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
+    #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
     bridge_address: String,
-    #[clap(default_value = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")]
+    #[arg(long, default_value = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")]
     bridge_erc20_handler_address: String,
-    #[clap(default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
+    #[arg(long, default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
     hei_token_address: String,
 }
 
 #[derive(Args)]
 pub struct AddRelayerCmdConf {
-    #[clap(default_value = "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc")]
+    #[arg(long, default_value = "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc")]
     relayer_address: String,
-    #[clap(default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
+    #[arg(long, default_value = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")]
     bridge_private_key: String,
-    #[clap(default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
+    #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
     bridge_address: String,
 }
 
@@ -109,7 +112,7 @@ pub async fn handle(command: &EthereumCommand) {
     let rpc_url = "http://localhost:8545";
     // this is the first private key printed out by anvil during startup
     match command {
-        EthereumCommand::Bridge(conf) => {
+        EthereumCommand::PayIn(conf) => {
             let erc_20_handler_address = Address::from_slice(&decode(&conf.bridge_erc20_handler_address).unwrap());
             let hei_address = Address::from_slice(&decode(&conf.hei_token_address).unwrap());
 
@@ -140,7 +143,7 @@ pub async fn handle(command: &EthereumCommand) {
             bridge_deposit(
                 conf.user_private_key.as_str(),
                 &conf.amount,
-                conf.to.to_owned(),
+                conf.dest_address.to_owned(),
                 &conf.bridge_address,
                 rpc_url,
             )
@@ -165,10 +168,10 @@ pub async fn handle(command: &EthereumCommand) {
             )
             .await;
         },
-        EthereumCommand::QueryERC20Amount(conf) => {
+        EthereumCommand::Balance(conf) => {
             let address = Address::from_str(&conf.account).unwrap();
             query_hei_token_amount(address, &conf.token_address, rpc_url).await;
-        }
+        },
     }
 }
 
@@ -192,13 +195,11 @@ async fn wrap_to(owner_private_key: &str, address: Address, amount: &str, hei_to
     transfer_builder.send().await.unwrap().watch().await.unwrap();
 }
 
-async fn query_hei_token_amount(
-    address: Address,
-    hei_token_address: &str,
-    rpc_url: &str
-) {
+async fn query_hei_token_amount(address: Address, hei_token_address: &str, rpc_url: &str) {
     info!("Querying hei token amount on address {}", address);
-    let provider = ProviderBuilder::new().with_recommended_fillers().on_http(rpc_url.parse().unwrap());
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .on_http(rpc_url.parse().unwrap());
 
     let artifact = include_str!("../artifacts/HEI.json");
     let json: serde_json::Value = serde_json::from_str(artifact).unwrap();
@@ -206,11 +207,16 @@ async fn query_hei_token_amount(
     let abi_value = json.get("abi").expect("Failed to get ABI from artifact");
     let abi = serde_json::from_str(&abi_value.to_string()).unwrap();
 
-    let contract_instance = ContractInstance::new(Address::from_str(hei_token_address).unwrap(), provider, Interface::new(abi));
+    let contract_instance =
+        ContractInstance::new(Address::from_str(hei_token_address).unwrap(), provider, Interface::new(abi));
 
-
-    let balance = contract_instance.function("balanceOf", &[DynSolValue::Address(address)]).unwrap().call().await.unwrap();
-    info!("Balance of {} is {:?}", address, balance);
+    let balance = contract_instance
+        .function("balanceOf", &[DynSolValue::Address(address)])
+        .unwrap()
+        .call()
+        .await
+        .unwrap();
+    println!("{}", balance.get(0).unwrap().as_uint().unwrap().0);
 }
 
 async fn approve_lit_to(
@@ -255,7 +261,10 @@ async fn setup_bridge(
 ) {
     info!("Setting up bridge");
     let bridge_instance = bridge_instance(bridge_address, by_private_key, rpc_url).await;
-    let resource_id = FixedBytes([158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223, 138, 246, 22, 42, 177, 69, 166]);
+    let resource_id = FixedBytes([
+        158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223,
+        138, 246, 22, 42, 177, 69, 166,
+    ]);
 
     let builder = bridge_instance.adminSetResource(
         Address::from_hex(bridge_erc20_handler_address).unwrap(),
@@ -271,16 +280,23 @@ async fn setup_bridge(
 
     info!("Adding MINTER role to ERC20Handler on HEI contract instance");
     let hei_instance = hei_token_instance(hei_token_address, by_private_key, rpc_url).await;
-    hei_instance.grantMinter(Address::from_hex(bridge_erc20_handler_address).unwrap()).send().await.unwrap().watch().await.unwrap();
-
-
-
+    hei_instance
+        .grantMinter(Address::from_hex(bridge_erc20_handler_address).unwrap())
+        .send()
+        .await
+        .unwrap()
+        .watch()
+        .await
+        .unwrap();
 }
 
 async fn bridge_deposit(by_private_key: &str, amount: &str, account: String, bridge_address: &str, rpc_url: &str) {
     info!("Bridging deposit");
     let bridge_instance = bridge_instance(bridge_address, by_private_key, rpc_url).await;
-    let resource_id = FixedBytes([158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223, 138, 246, 22, 42, 177, 69, 166]);
+    let resource_id = FixedBytes([
+        158, 230, 223, 182, 26, 47, 185, 3, 223, 72, 124, 64, 22, 99, 130, 86, 67, 187, 130, 93, 65, 105, 94, 99, 223,
+        138, 246, 22, 42, 177, 69, 166,
+    ]);
     // 0x + amount + address len + address (all 32 bytes padded)
     let amount = DynSolValue::Uint(U256::from_str_radix(amount, 10).unwrap(), 32).abi_encode();
     let account_id = AccountId32::from_str(account.as_str()).unwrap();

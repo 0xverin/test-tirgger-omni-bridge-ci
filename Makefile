@@ -59,15 +59,19 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	$(RM) -rf target/ Cargo.lock
+	$(RM) -rf target/
 
 .PHONY: build-docker
 build-docker:
 	docker build . --tag bridge:latest
 
+.PHONY: build-docker-dev
+build-docker-dev:
+	docker build -f Dockerfile.dev . --tag bridge:latest
+
 .PHONY: start-local
 start-local:
-	docker-compose up --force-recreate --build --remove-orphans
+	docker compose up --force-recreate --remove-orphans
 
 .PHONY: start-local-e2e-test
 start-local-e2e-test:
@@ -75,7 +79,7 @@ start-local-e2e-test:
 
 .PHONY: stop-local
 stop-local:
-	docker-compose down
+	docker compose down
 
 .PHONY: build-evm-contracts
 build-evm-contracts:

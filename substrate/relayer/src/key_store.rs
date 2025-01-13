@@ -24,15 +24,12 @@ pub struct SubstrateKeyStore {
 
 impl SubstrateKeyStore {
     pub fn new(path: String) -> Self {
-        let key = Self::generate_key().unwrap();
-        let store = Self { path };
-        store.write(&key).unwrap();
-
-        store
+        Self { path }
     }
 }
 
 impl KeyStore<SecretKeyBytes> for SubstrateKeyStore {
+    // unused
     fn generate_key() -> Result<SecretKeyBytes, ()> {
         Ok([
             45, 219, 105, 155, 49, 74, 164, 131, 153, 192, 15, 213, 225, 179, 167, 129, 12, 160, 229, 37, 133, 168,

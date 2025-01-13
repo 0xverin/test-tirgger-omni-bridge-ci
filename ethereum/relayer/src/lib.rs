@@ -16,12 +16,11 @@
 
 use crate::key_store::EthereumKeyStore;
 use crate::Bridge::BridgeInstance;
+use alloy::dyn_abi::DynSolValue;
 use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
-use alloy::providers::fillers::{
-    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
-};
+use alloy::providers::fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
 use alloy::providers::{Identity, ProviderBuilder, RootProvider, WalletProvider};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol;
@@ -33,7 +32,6 @@ use bridge_core::relay::Relayer;
 use log::{debug, error};
 use serde::Deserialize;
 use std::collections::HashMap;
-use alloy::dyn_abi::DynSolValue;
 
 pub mod key_store;
 
@@ -89,7 +87,7 @@ impl EthereumRelayer {
     pub fn new(rpc_url: &str, bridge_address: &str, key_store: EthereumKeyStore) -> Result<Self, ()> {
         let signer = PrivateKeySigner::from(key_store.read().map_err(|e| error!("Can't read key store: {:?}", e))?);
 
-        log::info!("The address of the local signer: {:?}", signer.address());
+        log::info!("Ethereum relayer address: {:?}", signer.address());
 
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
@@ -112,18 +110,11 @@ impl EthereumRelayer {
 
 #[async_trait]
 impl Relayer for EthereumRelayer {
-    async fn relay(
-        &self,
-        amount: u128,
-        nonce: u64,
-        resource_id: [u8; 32],
-        data: Vec<u8>,
-    ) -> Result<(), ()> {
+    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), ()> {
         debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
 
         // resource id 0
         let resource_id = FixedBytes::new(resource_id);
-
 
         let amount = DynSolValue::Uint(U256::from(amount), 32).abi_encode();
         let address_len = DynSolValue::Uint(U256::from(data.len()), 32).abi_encode();
@@ -145,19 +136,10 @@ impl Relayer for EthereumRelayer {
 
         debug!("Call data: {:?}", call_data);
 
-
         // domainId 0 - heima
-        let proposal_builder = self
-            .bridge_instance
-            .voteProposal(0, nonce, resource_id, call_data);
+        let proposal_builder = self.bridge_instance.voteProposal(0, nonce, resource_id, call_data);
 
-        proposal_builder
-            .send()
-            .await
-            .unwrap()
-            .watch()
-            .await
-            .unwrap();
+        proposal_builder.send().await.unwrap().watch().await.unwrap();
         debug!("Proposal relayed");
         Ok(())
     }

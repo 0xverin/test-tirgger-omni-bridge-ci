@@ -1,11 +1,11 @@
 # Running locally
 
 1. Build smart contract `make build-evm-contracts`
-2. Build bridge docker image `make build-docker`
-3. Build litentry parachain docker image from `bridge-pallet` branch
-4. Run docker-compose `make start-local`
+2. Build bridge docker image `make build-docker-dev`
+3. Run docker-compose `make start-local`
+4. (optional) Run local e2e test `make start-local-e2e-test`
 
-Ethereum and Substrate node can be access locally on ports 8545 and 9944 respectively. 
+Ethereum and Substrate node can be accessed locally on ports 8545 and 9944, respectively.
 
 ### Generating smart contract bindings
 
@@ -18,3 +18,4 @@ Smart contract bindings are used by CLI to interact with deployed smart contract
 
 Please refer to `bridge-cli` `README.md` for more inf how to complete setup (adding relayers etc.) and how to interact
 with bridge.
+An example can be found in `scripts/test-e2e-bridge.sh`.

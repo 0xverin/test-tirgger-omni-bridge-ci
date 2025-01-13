@@ -49,5 +49,17 @@ jobs:
 
       - name: Build
         run: |
-          make build-evm-contracts
-          make build-docker
+          make build-evm-contracts # we refer to Bridge.json in the code
+          cd artifacts/ethereum/HEI-token
+          npm i && npm run compile
+          cd -
+          make build-docker-dev
+
+      - name: Setup the network
+        run: |
+          docker compose up -d --remove-orphans
+          sleep 30
+
+      - name: Run e2e test
+        run: |
+          make start-local-e2e-test

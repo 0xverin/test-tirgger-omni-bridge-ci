@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-log = { workspace = true }
-bridge-core = { workspace = true }
 async-trait = { workspace = true }
+bridge-core = { workspace = true }
+log = { workspace = true }
 parity-scale-codec = { workspace = true }
-subxt = { workspace = true }
-serde = { workspace = true }
 scale-encode = { workspace = true }
+serde = { workspace = true }
+subxt = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

@@ -73,24 +73,21 @@ impl<
         self.connect_if_needed().await;
 
         if let Some(ref mut client) = self.client {
-            client
-                .get_block_pay_in_events(block_num)
-                .await
-                .map(|events| {
-                    events
-                        .into_iter()
-                        .map(|event| {
-                            PayIn::new(
-                                event.id,
-                                None,
-                                event.event.amount,
-                                event.event.nonce,
-                                event.event.resource_id,
-                                event.event.data,
-                            )
-                        })
-                        .collect()
-                })
+            client.get_block_pay_in_events(block_num).await.map(|events| {
+                events
+                    .into_iter()
+                    .map(|event| {
+                        PayIn::new(
+                            event.id,
+                            None,
+                            event.event.amount,
+                            event.event.nonce,
+                            event.event.resource_id,
+                            event.event.data,
+                        )
+                    })
+                    .collect()
+            })
         } else {
             Ok(vec![])
         }

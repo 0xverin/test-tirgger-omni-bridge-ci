@@ -4,8 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-bridge-core = { workspace = true }
+alloy = { workspace = true, features = ["contract", "signer-local"] }
 async-trait = { workspace = true }
-alloy = { workspace = true, features = ["contract", "signer-local"]}
+bridge-core = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }

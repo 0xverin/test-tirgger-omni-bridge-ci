@@ -1,7 +1,9 @@
 debug/
 target/
 .idea/
-**/*.bin
+*.bin
 
 cache
 out/**
+
+artifacts/ethereum/HEI-token/out/

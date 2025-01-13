@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -e
+
+function print_divider() {
+  echo "------------------------------------------------------------"
+}
+
+ROOTDIR=$(git rev-parse --show-toplevel)
+cd "$ROOTDIR"
+
+files=$((git diff --cached --name-only --diff-filter=ACMR | grep -Ei "\.rs$") || true)
+if [ ! -z "$files" ]; then
+  echo "[cargo fmt] and [git add] the following files:"
+  echo "$files"
+  cargo fmt --all
+  git add $(echo "$files" | paste -s -d " " -)
+  print_divider
+fi
+
+files=$((git diff --cached --name-only --diff-filter=ACMR | grep -Ei "Cargo.toml$") || true)
+if [ ! -z "$files" ]; then
+  echo "[taplo fmt] and [git add] the following files:"
+  echo "$files"
+  RUST_LOG=error taplo fmt
+  git add $(echo "$files" | paste -s -d " " -)
+  print_divider
+fi

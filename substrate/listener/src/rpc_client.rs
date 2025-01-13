@@ -45,10 +45,7 @@ pub struct PaidInEvent {
 #[async_trait]
 pub trait SubstrateRpcClient {
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()>;
-    async fn get_block_pay_in_events(
-        &mut self,
-        block_num: u64,
-    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()>;
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()>;
 }
 
 pub struct RpcClient<ChainConfig: Config> {
@@ -67,27 +64,17 @@ impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
             None => Err(()),
         }
     }
-    async fn get_block_pay_in_events(
-        &mut self,
-        block_num: u64,
-    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
-        match self
-            .legacy
-            .chain_get_block_hash(Some(block_num.into()))
-            .await
-            .map_err(|_| ())?
-        {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
+        match self.legacy.chain_get_block_hash(Some(block_num.into())).await.map_err(|_| ())? {
             Some(hash) => {
                 let events = self.events.at(BlockRef::from_hash(hash)).await.map_err(|_| ())?;
 
-                let pay_in_events =
-                    events.find::<crate::litentry_rococo::omni_bridge::events::PaidIn>();
+                let pay_in_events = events.find::<crate::litentry_rococo::omni_bridge::events::PaidIn>();
 
                 Ok(pay_in_events
                     .enumerate()
                     .map(|(i, event)| {
-                        let event: crate::litentry_rococo::omni_bridge::events::PaidIn =
-                            event.unwrap();
+                        let event: crate::litentry_rococo::omni_bridge::events::PaidIn = event.unwrap();
                         BlockEvent::new(
                             EventId::new(block_num, i as u64),
                             PaidInEvent {
@@ -120,10 +107,7 @@ impl SubstrateRpcClient for MockedRpcClient {
         Ok(self.block_num)
     }
 
-    async fn get_block_pay_in_events(
-        &mut self,
-        _block_num: u64,
-    ) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
+    async fn get_block_pay_in_events(&mut self, _block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
         Ok(vec![])
     }
 }
@@ -145,9 +129,7 @@ impl<ChainConfig: Config> RpcClientFactory<ChainConfig> {
 }
 
 #[async_trait]
-impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>>
-    for RpcClientFactory<ChainConfig>
-{
+impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>> for RpcClientFactory<ChainConfig> {
     async fn new_client(&self) -> Result<RpcClient<ChainConfig>, ()> {
         let rpc_client = subxt::backend::rpc::RpcClient::from_insecure_url(self.url.clone())
             .await

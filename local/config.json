@@ -15,7 +15,7 @@
       "id": "rococo",
       "relayers": ["sepolia"],
       "config": {
-        "ws_rpc_endpoint": "ws://litentry-node:9944",
+        "ws_rpc_endpoint": "ws://heima-node:9944",
         "start_block": 0
       }
     }
@@ -33,7 +33,7 @@
       "relayer_type": "substrate",
       "id": "rococo",
       "config": {
-        "ws_rpc_endpoint": "ws://litentry-node:9944"
+        "ws_rpc_endpoint": "ws://heima-node:9944"
       }
     }
   ]

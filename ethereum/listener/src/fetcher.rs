@@ -92,14 +92,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                 let amount_bytes = &data[0..32];
                 let amount: U256 = U256::abi_decode(amount_bytes, false).unwrap();
 
-                PayIn::new(
-                    log.id,
-                    Some(log.address),
-                    amount.try_into().unwrap(),
-                    nonce,
-                    resource_id.0,
-                    data.into(),
-                )
+                PayIn::new(log.id, Some(log.address), amount.try_into().unwrap(), nonce, resource_id.0, data.into())
             })
             .collect();
 

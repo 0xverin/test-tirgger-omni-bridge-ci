@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = {  workspace = true }
-log = { workspace = true }
-async-trait = { workspace = true }
-parity-scale-codec = { workspace = true }
 alloy = { workspace = true, features = ["rpc", "rpc-types", "dyn-abi", "contract"] }
+async-trait = { workspace = true }
+log = { workspace = true }
+parity-scale-codec = { workspace = true }
 serde = { version = "1.0.217", features = ["derive"] }
+tokio = { workspace = true }
 
 bridge-core = { workspace = true }
 
 [dev-dependencies]
-env_logger = {  workspace = true }
+env_logger = { workspace = true }

@@ -1,50 +1,55 @@
 #!/bin/bash
+set -euo pipefail
 
-TARGET_DIR="./target/release"
-BINARY_NAME="bridge-cli"
-BINARY_PATH="$TARGET_DIR/$BINARY_NAME"
+# we assume the environment is already intialised by `docker compose up`
+# TODO: add check
 
-if [ ! -f "$BINARY_PATH" ]; then
-    echo "Binary $BINARY_NAME not found. Building..."
-    
-    cargo build -p bridge-cli --release
+ROOTDIR=$(git rev-parse --show-toplevel)
+cd "$ROOTDIR"
+cargo b -p bridge-cli
 
-    # Check if the build was successful
-    if [ $? -ne 0 ]; then
-        echo "Build failed. Exiting."
-        exit 1
-    fi
+CLI=./target/debug/bridge-cli
+
+$CLI --version
+
+echo "adds relayer to ethereum chain bridge ..."
+RUST_LOG=info $CLI ethereum add-relayer
+
+echo "set up ethereum bridge ..."
+RUST_LOG=info $CLI ethereum setup-bridge
+
+echo "set up substrate bridge ..."
+RUST_LOG=info $CLI substrate setup-bridge
+
+echo "bridge 100 LIT from heima to eth ..."
+RUST_LOG=info $CLI substrate pay-in --dest-address 70997970C51812dc3A010C7d01b50e0d17dc79C8 --amount 100000000000000000000
+
+echo "wait for 18s ..." 
+sleep 18
+
+echo "check if the bridge was ok ..."
+r=$($CLI ethereum balance --account 0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
+if [ $r = "100000000000000000000" ]; then
+  echo "balance ok"
+else
+  echo "nok: $r"
+  exit 1
 fi
 
-CLI="$BINARY_PATH"
+echo "bridge 100 HEI from eth to heima ..."
+# use `//Bob` as recipient for a deterministic balance check, as Alice paied some tx fee for previou tx 
+RUST_LOG=info $CLI ethereum pay-in --dest-address 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty --amount 100000000000000000000
 
-echo "CLI binary path: $CLI"
+echo "wait for 30s ..."
+sleep 30
 
-echo "Setting up chainbridge for dev testing using CLI" 
-$CLI substrate setup-dev-chain-bridge 
-echo "Finished setting up chainbridge on Parachain" 
-
-# This is a test private_key for local e2e test
-export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-echo "Deploying contracts on Anvil node" 
-cd ethereum/chainbridge-contracts
-forge script script/all-contracts.s.sol:DeployAllContracts --rpc-url http://localhost:8545 --broadcast
-echo "Completed Deploying contracts" 
-
-cd .. 
-cd .. 
-
-echo "$(pwd)"
-echo "Waiting for Deposit..." 
-sleep 24
-
-# This should be 10_000_000_000_000_000_000 if bridge works 
-$CLI substrate balance esrJNKDP4tvAkGMC9Su2VYTAycU2nrQy8qt4dFhdXwV19Yh1K
-
-echo "Perform Withdraw Operation" 
-$CLI substrate dev-test-withdraw
-
-
-
-
+echo "check if bridge was ok ..."
+r=$($CLI substrate balance --account 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty)
+# Bob should have 1100 LIT now: 1000 from genesis + 100 bridged
+if [ $r = "1100000000000000000000" ]; then
+  echo "balance ok"
+  exit 0
+else
+  echo "nok: $r"
+  exit 1
+fi

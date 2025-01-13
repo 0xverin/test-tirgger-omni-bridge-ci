@@ -76,7 +76,7 @@ pub async fn create_listener<ChainConfig: Config>(
     let client_factory: RpcClientFactory<ChainConfig> = RpcClientFactory::new(&config.ws_rpc_endpoint);
 
     let fetcher = Fetcher::new(client_factory);
-    let last_processed_log_repository = FileCheckpointRepository::new("data/substrate_last_log.bin");
+    let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
     Listener::new(
         id,

@@ -1,33 +1,22 @@
-Ethereum bridge contract needs to be built first in order to interact with it's instance.
+Ethereum bridge contract needs to be built first in order to interact with its instance.
 
 `cd ../ethereum/chainbridge-contracts/ && forge build`
 
-# Setting up local env
+# Bridging using CLI
 
+Cli commands are divided into two groups [ethereum,substrate]. Pick one of them and execute `pay-in` command in order to trigger asset bridging.
 
 For bridging substrate -> ethereum
 
-(asset handling on substrate side is missing - no tokens are taken)
+1. Set up relayer on ethereum side: `./bridge-cli ethereum add-relayer --relayer_address 0x70997970c51812dc3a010c7d01b50e0d17dc79c8`
+2. Set up bridge on substrate side: `./bridge-cli substrate setup-bridge`
+2. Pay in from substrate: `./bridge-cli substrate pay-in --dest-address 70997970C51812dc3A010C7d01b50e0d17dc79C8 --amount 100000000000000000000`
 
-1. set ethereum relayer with public key printed to logs `./bridge-cli ethereum add-relayer 0x70997970c51812dc3a010c7d01b50e0d17dc79c8`
-2. fund bridge EoA with ERC20 tokens `./bridge-cli ethereum transfer 0x5FbDB2315678afecb367f032d93F642f64180aa3 10000000`
-3. Pay in `./bridge-cli substrate pay-in 10`
+Later you can query the HEI balance of dest-address by `./bridge-cli ethereum balance --account 0x70997970C51812dc3A010C7d01b50e0d17dc79C8`
 
 For bridging ethereum -> substrate
 
-(asset handling on substrate side is missing - no tokens are given)
+1. Set up chainbridge contracts: `./bridge-cli ethereum setup-bridge`
+2. Pay in from ethereum: `./bridge-cli ethereum pay-in --dest-address 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty --amount 100000000000000000000`
 
-1. Add substrate account 5C7C2Z5sWbytvHpuLTvzKunnnRwQxft1jiqrLD5rhucQ5S9X as Admin on PalletBridge using sudo call through polkadotjs
-2. Add substrate relayer `./bridge-cli substrate add-relayer 5DFW6oheaiW3XMDaPFi7RYLsKdPimAaY8Ajz2zA6S4STHG1D`
-3. Setup chainbridge contracts `./bridge-cli ethereum setup-bridge`
-4. Fund account with LIT tokens, swap them to HEI and execute chaindbridge deposit `./bridge-cli ethereum bridge 100 1cJNyZCPxpf1UPPt8ckHsiN8N77ykMK9kmamrFY2rE6d77F`
-5. You should see `PaidOut` event emitted on substrate chain
-
-# Bridging using CLI
-
-Cli commands are divided into two groups [ethereum,substrate]. Pick one of them and execute `pay-in`/`deposit` command in order to trigger asset bridging.
-
-### Example
-Bridge tokens from substrate to the other end of the bridge (ethereum):
-
-`RUST_LOG=info ./bridge-cli substrate pay-in 10`
+Later you should see `PaidOut` event emitted on substrate chain, and query the LIT balance of dest-address by `./bridge-cli substrate balance --account 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty`

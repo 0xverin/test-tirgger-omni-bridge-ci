@@ -17,6 +17,3 @@
 [submodule "ethereum/chainbridge-contracts/lib/forge-std"]
 	path = ethereum/chainbridge-contracts/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "artifacts/ethereum/HEI-token"]
-	path = artifacts/ethereum/HEI-token
-	url = git@github.com:litentry/HEI-token.git

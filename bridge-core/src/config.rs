@@ -67,7 +67,7 @@ pub mod tests {
 
     #[test]
     pub fn deserialize_sample_config() {
-        let config = fs::read("../artifacts/bridge_config.json").unwrap();
+        let config = fs::read("../local/config.json").unwrap();
         let bridge_worker_config: BridgeConfig = serde_json::from_slice(&config).unwrap();
 
         assert_eq!(bridge_worker_config.listeners.len(), 2);
@@ -89,7 +89,7 @@ pub mod tests {
 
         let rococo_config: substrate_listener::listener::ListenerConfig = bridge_worker_config.get_listener_config(1);
 
-        assert_eq!(rococo_config.ws_rpc_endpoint, "ws://litentry-node:9944");
+        assert_eq!(rococo_config.ws_rpc_endpoint, "ws://heima-node:9944");
         assert_eq!(rococo_config.start_block, 0);
 
         assert_eq!(bridge_worker_config.relayers[0].id, "sepolia");
@@ -107,6 +107,6 @@ pub mod tests {
         let rococo_relayer_config: substrate_relayer::RelayerConfig =
             bridge_worker_config.relayers[1].to_specific_config();
 
-        assert_eq!(rococo_relayer_config.ws_rpc_endpoint, "ws://litentry-node:9944");
+        assert_eq!(rococo_relayer_config.ws_rpc_endpoint, "ws://heima-node:9944");
     }
 }

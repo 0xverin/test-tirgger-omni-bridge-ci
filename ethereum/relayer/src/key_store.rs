@@ -31,11 +31,10 @@ impl EthereumKeyStore {
 }
 
 impl KeyStore<SigningKey> for EthereumKeyStore {
+    // unused
     fn generate_key() -> Result<SigningKey, ()> {
-        SigningKey::from_slice(
-            &decode("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").unwrap(),
-        )
-        .map_err(|_| ())
+        SigningKey::from_slice(&decode("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").unwrap())
+            .map_err(|_| ())
     }
 
     fn serialize(k: &SigningKey) -> Result<Vec<u8>, ()> {
