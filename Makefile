@@ -6,9 +6,9 @@ ARCH_LIBDIR ?= /lib/$(shell $(CC) -dumpmachine)
 SELF_EXE = target/release/bridge-worker
 
 .PHONY: all
-all: $(SELF_EXE) bridge.manifest
+all: $(SELF_EXE) omni-bridge.manifest
 ifeq ($(SGX),1)
-all: bridge.manifest.sgx bridge.sig
+all: omni-bridge.manifest.sgx omni-bridge.sig
 endif
 
 ifeq ($(DEBUG),1)
@@ -25,7 +25,7 @@ endif
 $(SELF_EXE): Cargo.toml
 	cargo build --release
 
-bridge.manifest: bridge.manifest.template
+omni-bridge.manifest: omni-bridge.manifest.template
 	gramine-manifest \
 		-Dlog_level=$(GRAMINE_LOG_LEVEL) \
 		-Darch_libdir=$(ARCH_LIBDIR) \
@@ -34,13 +34,14 @@ bridge.manifest: bridge.manifest.template
 
 # Make on Ubuntu <= 20.04 doesn't support "Rules with Grouped Targets" (`&:`),
 # see the helloworld example for details on this workaround.
-bridge.manifest.sgx bridge.sig: sgx_sign
+omni-bridge.manifest.sgx omni-bridge.sig: sgx_sign
 	@:
 
 .INTERMEDIATE: sgx_sign
-sgx_sign: bridge.manifest $(SELF_EXE)
+sgx_sign: omni-bridge.manifest $(SELF_EXE)
 	gramine-sgx-sign \
 		--manifest $< \
+		--key enclave-key.pem \
 		--output $<.sgx
 
 ifeq ($(SGX),)
@@ -51,7 +52,7 @@ endif
 
 .PHONY: start-gramine-server
 start-gramine-server: all
-	$(GRAMINE) bridge
+	$(GRAMINE) omni-bridge
 
 .PHONY: clean
 clean:
@@ -60,10 +61,6 @@ clean:
 .PHONY: distclean
 distclean: clean
 	$(RM) -rf target/
-
-.PHONY: build-docker
-build-docker:
-	docker build . --tag bridge:latest
 
 .PHONY: build-docker-dev
 build-docker-dev:

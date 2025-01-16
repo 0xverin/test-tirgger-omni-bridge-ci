@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+
+### Gramine Builder
+##################################################
+FROM gramineproject/gramine:stable-jammy AS build
+
+WORKDIR /usr/src/omni-bridge
+COPY . .
+
+# Update default packages
+RUN apt-get update
+
+# Get Ubuntu packages
+RUN apt-get install -y \
+    build-essential \
+    curl \
+    libssl-dev \
+    pkg-config
+
+# Get Rust
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+
+# Add .cargo/bin to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN cargo --version
+
+RUN --mount=type=secret,id=signer,target=/usr/src/omni-bridge/enclave-key.pem \
+    make SGX=1
+
+### Gramine image
+##################################################
+FROM gramineproject/gramine:stable-jammy AS runner
+
+WORKDIR /usr/src/omni-bridge
+
+# Update default packages
+RUN apt-get update
+
+# Get Ubuntu packages
+RUN apt-get install -y \
+    build-essential \
+    curl \
+    libssl-dev \
+    ca-certificates
+
+COPY --from=build /usr/src/omni-bridge/target/release/bridge-worker /usr/src/omni-bridge/target/release/bridge-worker
+COPY --from=build /usr/src/omni-bridge/omni-bridge.sig /usr/src/omni-bridge/omni-bridge.sig
+COPY --from=build /usr/src/omni-bridge/omni-bridge.manifest.sgx /usr/src/omni-bridge/omni-bridge.manifest.sgx
+
+COPY --from=build /usr/src/omni-bridge/config.json /usr/src/omni-bridge/config.json
+COPY --from=build /usr/src/omni-bridge/auth_key_pub.bin /usr/src/omni-bridge/auth_key_pub.bin
+
+ENTRYPOINT ["gramine-sgx", "omni-bridge"]

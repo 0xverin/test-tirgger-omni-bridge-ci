@@ -7,3 +7,8 @@ cache
 out/**
 
 artifacts/ethereum/HEI-token/out/
+
+# Gramine generated manifest files
+*.manifest
+*.manifest.sgx
+*.sig

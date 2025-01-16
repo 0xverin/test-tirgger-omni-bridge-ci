@@ -50,9 +50,25 @@ impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
     }
 }
 
+pub struct StartBlock {
+    pub listener_id: String,
+    pub block_num: u64,
+}
+
+impl TryFrom<&String> for StartBlock {
+    type Error = ();
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        let values: Vec<&str> = value.split(":").collect();
+        let block_num = (values.get(1).ok_or(())?).parse::<u64>().map_err(|_| ())?;
+        Ok(StartBlock { listener_id: values.first().unwrap().to_string(), block_num })
+    }
+}
+
 pub struct ListenerContext<T> {
     pub id: String,
     pub config: T,
+    pub start_block: u64,
     pub relayers: Vec<Box<dyn crate::relay::Relayer>>,
 }
 
@@ -60,6 +76,7 @@ pub fn prepare_listener_context<T: DeserializeOwned>(
     config: &BridgeConfig,
     listener_type: &str,
     relayers: &mut HashMap<String, HashMap<String, Box<dyn crate::relay::Relayer>>>,
+    start_blocks: &HashMap<String, u64>,
 ) -> Vec<ListenerContext<T>> {
     let mut components = vec![];
     for listener_config in config.listeners.iter().filter(|l| l.listener_type == listener_type) {
@@ -73,9 +90,13 @@ pub fn prepare_listener_context<T: DeserializeOwned>(
                 }
             }
         }
+
+        let start_block = *start_blocks.get(&listener_config.id).unwrap_or(&0);
+
         components.push(ListenerContext {
             id: listener_config.id.clone(),
             config: ethereum_listener_config,
+            start_block,
             relayers: listener_relayers,
         });
     }

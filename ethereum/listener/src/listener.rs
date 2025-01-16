@@ -28,7 +28,6 @@ pub type EthereumPayInEvent = PayIn<PayInEventId, EventSourceId>;
 pub struct ListenerConfig {
     pub node_rpc_url: String,
     pub bridge_contract_address: String,
-    pub start_block: u64,
 }
 
 pub type EthereumListener<RpcClient, CheckpointRepository> =

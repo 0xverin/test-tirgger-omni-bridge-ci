@@ -20,7 +20,7 @@ use crate::rpc::methods::{ImportRelayerKeyPayload, SignedParams};
 use crate::shielding_key::ShieldingKey;
 
 use bridge_core::config::BridgeConfig;
-use bridge_core::listener::{prepare_listener_context, ListenerContext};
+use bridge_core::listener::{prepare_listener_context, ListenerContext, StartBlock};
 use bridge_core::relay::Relayer;
 use clap::Parser;
 use ethereum_listener::create_listener;
@@ -36,6 +36,8 @@ use serde_json::value::RawValue;
 use sha2::Sha256;
 use sp_core::{keccak_256, ByteArray, Pair};
 use std::collections::HashMap;
+use std::fs::create_dir;
+use std::path::Path;
 use std::thread::JoinHandle;
 use std::{fs, io::Write};
 use std::{
@@ -64,7 +66,7 @@ async fn main() -> Result<(), ()> {
     match &cli.command {
         Commands::Run(arg) => run(arg).await?,
         Commands::AwaitKeystoreImport(arg) => await_import(arg).await,
-        Commands::GenerateAuthKey => generate_auth_key(),
+        Commands::GenerateAuthKey(arg) => generate_auth_key(arg),
         Commands::BuildKeystoreImport(arg) => build_import(arg),
     }
 
@@ -106,16 +108,28 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
         ethereum_relayer::create_from_config(keystore_dir, &config);
     relayers.insert("ethereum".to_string(), ethereum_relayers);
 
+    let mut start_blocks: HashMap<String, u64> = HashMap::new();
+
+    arg.start_block
+        .iter()
+        .map(|s| {
+            let start_block: StartBlock = s.try_into().unwrap();
+            start_block
+        })
+        .for_each(|start_block| {
+            start_blocks.insert(start_block.listener_id, start_block.block_num);
+        });
+
     // start ethereum listeners
     let ethereum_listener_contexts: Vec<ListenerContext<EthereumListenerConfig>> =
-        prepare_listener_context(&config, "ethereum", &mut relayers);
+        prepare_listener_context(&config, "ethereum", &mut relayers, &start_blocks);
     for ethereum_listener_context in ethereum_listener_contexts {
         handles.push(sync_ethereum(ethereum_listener_context).unwrap());
     }
 
     // start substrate listeners
     let substrate_listener_contexts: Vec<ListenerContext<SubstrateListenerConfig>> =
-        prepare_listener_context(&config, "substrate", &mut relayers);
+        prepare_listener_context(&config, "substrate", &mut relayers, &start_blocks);
     for substrate_listener_context in substrate_listener_contexts {
         // todo: remove unwrap ??
         handles.push(sync_litentry_rococo(substrate_listener_context).await.unwrap())
@@ -128,16 +142,34 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
     Ok(())
 }
 
-fn generate_auth_key() {
+fn generate_auth_key(arg: &GenerateArgs) {
     println!("Generating auth key ...");
     let mut seed = [0u8; 32];
     OsRng.fill(&mut seed);
     let pair = sp_core::ecdsa::Pair::from_seed_slice(&seed).unwrap();
-    fs::write(AUTH_KEY_SEED_PATH, hex::encode(pair.seed().as_slice())).unwrap();
-    fs::write(AUTH_KEY_PUB_PATH, hex::encode(pair.public().as_slice())).unwrap();
+
+    if let Some(ref path) = arg.generate_path {
+        if !Path::new(path).exists() {
+            create_dir(path).unwrap();
+        }
+    }
+
+    let auth_key_seed_path = arg
+        .generate_path
+        .as_ref()
+        .map(|path| Path::new(path).join(AUTH_KEY_SEED_PATH))
+        .unwrap_or(Path::new(AUTH_KEY_SEED_PATH).to_path_buf());
+    let auth_key_pub_path = arg
+        .generate_path
+        .as_ref()
+        .map(|path| Path::new(path).join(AUTH_KEY_PUB_PATH))
+        .unwrap_or(Path::new(AUTH_KEY_PUB_PATH).to_path_buf());
+
+    fs::write(&auth_key_seed_path, hex::encode(pair.seed().as_slice())).unwrap();
+    fs::write(auth_key_pub_path, hex::encode(pair.public().as_slice())).unwrap();
 
     println!("Auth public key in hex: {}", hex::encode(pair.public().as_slice()));
-    println!("Auth private key saved to file: {} ", AUTH_KEY_SEED_PATH);
+    println!("Auth private key saved to file: {:?} ", auth_key_seed_path);
 }
 
 fn build_import(arg: &ImportArgs) {
@@ -166,6 +198,7 @@ async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConf
         &context.id,
         Handle::current(),
         &context.config,
+        context.start_block,
         relayer,
         sub_stop_receiver,
     )
@@ -189,6 +222,7 @@ fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result
         &context.id,
         Handle::current(),
         &context.config,
+        context.start_block,
         relayer,
         finalization_gap_blocks,
         stop_receiver,

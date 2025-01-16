@@ -19,3 +19,10 @@ Smart contract bindings are used by CLI to interact with deployed smart contract
 Please refer to `bridge-cli` `README.md` for more inf how to complete setup (adding relayers etc.) and how to interact
 with bridge.
 An example can be found in `scripts/test-e2e-bridge.sh`.
+
+
+### Preparing Gramine docker image
+
+1. Create `config.json` file in the root of the repository. This file should contain bridge configuration (see `local/config.json`)
+2. Create `auth_key_pub.bin` file containing keystore importer public key.
+3. Build docker image `docker build --secret id=signer,src=<path to enclave signing key> -f Dockerfile.gramine --tag litentry/omni-bridge:latest .`

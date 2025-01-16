@@ -97,11 +97,15 @@ where
     fn save(&mut self, checkpoint: Checkpoint) -> Result<(), ()> {
         log::trace!("Saving checkpoint: {:?}", checkpoint);
         let content = checkpoint.encode();
-        if let Ok(mut file) = File::create(&self.file_name) {
-            file.write(content.as_slice()).map_err(|_| ())?;
-            Ok(())
-        } else {
-            Err(())
+        match File::create(&self.file_name) {
+            Ok(mut file) => {
+                file.write(content.as_slice()).map_err(|_| ())?;
+                Ok(())
+            },
+            Err(e) => {
+                log::error!("Could not create file {:?}: {:?}", self.file_name, e);
+                Err(())
+            },
         }
     }
 }

@@ -38,7 +38,13 @@ pub enum Commands {
     /// Generates curl command to import keystore
     BuildKeystoreImport(ImportArgs),
     /// Generates new ECDSA JSON-RPC auth key for keystore import
-    GenerateAuthKey,
+    GenerateAuthKey(GenerateArgs),
+}
+
+#[derive(Args)]
+pub struct GenerateArgs {
+    #[arg(short, long, value_name = "generate folder path")]
+    pub generate_path: Option<String>,
 }
 
 #[derive(Args)]
@@ -48,6 +54,9 @@ pub struct RunArgs {
 
     #[arg(short, long, default_value = "config.json", value_name = "bridge config file path")]
     pub config: String,
+
+    #[arg(short, long, value_name = "listeners start block")]
+    pub start_block: Vec<String>,
 }
 
 #[derive(Args)]

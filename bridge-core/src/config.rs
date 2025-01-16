@@ -81,7 +81,6 @@ pub mod tests {
 
         assert_eq!(sepolia_config.node_rpc_url, "http://ethereum-node:8545");
         assert_eq!(sepolia_config.bridge_contract_address, "0x5FbDB2315678afecb367f032d93F642f64180aa3");
-        assert_eq!(sepolia_config.start_block, 0);
 
         assert_eq!(bridge_worker_config.listeners[1].id, "rococo");
         assert_eq!(bridge_worker_config.listeners[1].relayers[0], "sepolia");
@@ -90,7 +89,6 @@ pub mod tests {
         let rococo_config: substrate_listener::listener::ListenerConfig = bridge_worker_config.get_listener_config(1);
 
         assert_eq!(rococo_config.ws_rpc_endpoint, "ws://heima-node:9944");
-        assert_eq!(rococo_config.start_block, 0);
 
         assert_eq!(bridge_worker_config.relayers[0].id, "sepolia");
         assert_eq!(bridge_worker_config.relayers[0].relayer_type, "ethereum");

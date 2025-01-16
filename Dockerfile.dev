@@ -6,6 +6,8 @@ RUN cargo build --release -p bridge-worker
 FROM ubuntu:22.04
 WORKDIR /opt/omni-bridge
 
+RUN apt update && apt install -y ca-certificates
+
 COPY --from=builder /usr/src/omni-bridge/target/release/bridge-worker ./bridge-worker
 COPY --from=builder /usr/src/omni-bridge/local/config.json ./config.json
 COPY --from=builder /usr/src/omni-bridge/local/keystore ./keystore

@@ -40,6 +40,7 @@ pub fn create_listener(
     id: &str,
     handle: Handle,
     config: &ListenerConfig,
+    start_block: u64,
     relays: Box<dyn Relayer>,
     finalization_gap_blocks: u64,
     stop_signal: Receiver<()>,
@@ -64,7 +65,7 @@ pub fn create_listener(
         relay::Relay::Single(relays),
         stop_signal,
         last_processed_log_repository,
-        config.start_block,
+        start_block,
     )
     .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
 

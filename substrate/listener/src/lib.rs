@@ -70,6 +70,7 @@ pub async fn create_listener<ChainConfig: Config>(
     id: &str,
     handle: Handle,
     config: &ListenerConfig,
+    start_block: u64,
     relayer: Box<dyn Relayer>,
     stop_signal: Receiver<()>,
 ) -> Result<SubstrateListener<RpcClient<ChainConfig>, RpcClientFactory<ChainConfig>, FileCheckpointRepository>, ()> {
@@ -78,13 +79,5 @@ pub async fn create_listener<ChainConfig: Config>(
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
-    Listener::new(
-        id,
-        handle,
-        fetcher,
-        Relay::Single(relayer),
-        stop_signal,
-        last_processed_log_repository,
-        config.start_block,
-    )
+    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
 }
