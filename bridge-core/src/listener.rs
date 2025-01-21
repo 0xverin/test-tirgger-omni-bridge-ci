@@ -205,61 +205,68 @@ impl<
             };
 
             if last_finalized_block >= block_number_to_sync {
-                if let Ok(events) = self.handle.block_on(self.fetcher.get_block_pay_in_events(block_number_to_sync)) {
-                    for event in events {
-                        let maybe_relayer = match self.relay {
-                            Relay::Single(ref relay) => Some(relay),
-                            Relay::Multi(ref relayers) => {
-                                if let Some(event_source_id) = event.maybe_event_source {
-                                    relayers.get(&event_source_id)
-                                } else {
-                                    None
-                                }
-                            },
-                        };
-                        if let Some(relayer) = maybe_relayer {
-                            if let Some(ref checkpoint) =
-                                self.checkpoint_repository.get().expect("Could not read checkpoint")
-                            {
-                                if checkpoint.lt(&event.id.clone().into()) {
-                                    log::info!("Relaying");
-                                    if self
-                                        .handle
-                                        .block_on(relayer.relay(
-                                            event.amount,
-                                            event.nonce,
-                                            event.resource_id,
-                                            event.data,
-                                        ))
-                                        .is_err()
-                                    {
-                                        log::info!("Could not relay");
-                                        sleep(Duration::from_secs(1));
-                                        continue 'main;
+                match self.handle.block_on(self.fetcher.get_block_pay_in_events(block_number_to_sync)) {
+                    Ok(events) => {
+                        for event in events {
+                            let maybe_relayer = match self.relay {
+                                Relay::Single(ref relay) => Some(relay),
+                                Relay::Multi(ref relayers) => {
+                                    if let Some(event_source_id) = event.maybe_event_source {
+                                        relayers.get(&event_source_id)
+                                    } else {
+                                        None
                                     }
-                                } else {
-                                    log::debug!("Skipping event");
+                                },
+                            };
+                            if let Some(relayer) = maybe_relayer {
+                                if let Some(ref checkpoint) =
+                                    self.checkpoint_repository.get().expect("Could not read checkpoint")
+                                {
+                                    if checkpoint.lt(&event.id.clone().into()) {
+                                        log::info!("Relaying");
+                                        if self
+                                            .handle
+                                            .block_on(relayer.relay(
+                                                event.amount,
+                                                event.nonce,
+                                                event.resource_id,
+                                                event.data,
+                                            ))
+                                            .is_err()
+                                        {
+                                            log::info!("Could not relay");
+                                            sleep(Duration::from_secs(1));
+                                            continue 'main;
+                                        }
+                                    } else {
+                                        log::debug!("Skipping event");
+                                    }
+                                } else if self
+                                    .handle
+                                    .block_on(relayer.relay(event.amount, event.nonce, event.resource_id, event.data))
+                                    .is_err()
+                                {
+                                    log::info!("Could not relay");
+                                    sleep(Duration::from_secs(1));
+                                    continue 'main;
                                 }
-                            } else if self
-                                .handle
-                                .block_on(relayer.relay(event.amount, event.nonce, event.resource_id, event.data))
-                                .is_err()
-                            {
-                                log::info!("Could not relay");
-                                sleep(Duration::from_secs(1));
-                                continue 'main;
                             }
+                            self.checkpoint_repository
+                                .save(event.id.into())
+                                .expect("Could not save checkpoint");
                         }
+                        // we processed block completely so store new checkpoint
                         self.checkpoint_repository
-                            .save(event.id.into())
+                            .save(CheckpointT::from(block_number_to_sync))
                             .expect("Could not save checkpoint");
-                    }
-                    // we processed block completely so store new checkpoint
-                    self.checkpoint_repository
-                        .save(CheckpointT::from(block_number_to_sync))
-                        .expect("Could not save checkpoint");
-                    log::info!("Finished syncing block: {}", block_number_to_sync);
-                    block_number_to_sync += 1;
+                        log::info!("Finished syncing block: {}", block_number_to_sync);
+                        block_number_to_sync += 1;
+                    },
+                    Err(e) => {
+                        log::error!("Could not get events: {:?}", e);
+                        sleep(Duration::from_secs(1));
+                        continue 'main;
+                    },
                 }
             }
 
