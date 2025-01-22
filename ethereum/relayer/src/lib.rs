@@ -21,7 +21,7 @@ use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
-use alloy::providers::{Identity, ProviderBuilder, RootProvider, WalletProvider};
+use alloy::providers::{Identity, ProviderBuilder, RootProvider};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol;
 use alloy::transports::http::{Client, Http};
@@ -42,32 +42,14 @@ sol!(
     "../../ethereum/chainbridge-contracts/out/Bridge.sol/Bridge.json"
 );
 
-#[derive(Deserialize)]
-pub struct RelayerConfig {
-    pub node_rpc_url: String,
-    pub bridge_contract_address: String,
+#[async_trait]
+pub trait BridgeInterface {
+    async fn vote_proposal(&self, domain_id: u8, deposit_nonce: u64, resource_id: FixedBytes<32>, call_data: Bytes);
 }
 
-pub fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
-    let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
-    for relayer_config in config.relayers.iter().filter(|r| r.relayer_type == "ethereum") {
-        let key_store = EthereumKeyStore::new(format!("{}/{}.bin", keystore_dir, relayer_config.id));
-        let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
-        let relayer: EthereumRelayer = EthereumRelayer::new(
-            &substrate_relayer_config.node_rpc_url,
-            &substrate_relayer_config.bridge_contract_address,
-            key_store,
-        )
-        .unwrap();
-        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
-    }
-    relayers
-}
-
-/// Relays bridge request to smart contracts deployed on ethereum based network.
 #[allow(clippy::type_complexity)]
-pub struct EthereumRelayer {
-    bridge_instance: BridgeInstance<
+pub struct BridgeContractWrapper {
+    instance: BridgeInstance<
         Http<Client>,
         FillProvider<
             JoinFill<
@@ -81,35 +63,73 @@ pub struct EthereumRelayer {
     >,
 }
 
-// TODO: We need to configure gas options
-#[allow(clippy::result_unit_err)]
-impl EthereumRelayer {
-    pub fn new(rpc_url: &str, bridge_address: &str, key_store: EthereumKeyStore) -> Result<Self, ()> {
-        let signer = PrivateKeySigner::from(key_store.read().map_err(|e| error!("Can't read key store: {:?}", e))?);
+#[async_trait]
+impl BridgeInterface for BridgeContractWrapper {
+    async fn vote_proposal(&self, domain_id: u8, deposit_nonce: u64, resource_id: FixedBytes<32>, call_data: Bytes) {
+        let proposal_builder = self.instance.voteProposal(domain_id, deposit_nonce, resource_id, call_data);
+        proposal_builder.send().await.unwrap().watch().await.unwrap();
+    }
+}
 
+#[derive(Deserialize)]
+pub struct RelayerConfig {
+    pub node_rpc_url: String,
+    pub bridge_contract_address: String,
+}
+
+pub fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
+    let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
+    for relayer_config in config.relayers.iter().filter(|r| r.relayer_type == "ethereum") {
+        let key_store = EthereumKeyStore::new(format!("{}/{}.bin", keystore_dir, relayer_config.id));
+
+        let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
+
+        let signer =
+            PrivateKeySigner::from(key_store.read().map_err(|e| error!("Can't read key store: {:?}", e)).unwrap());
         log::info!("Ethereum relayer address: {:?}", signer.address());
 
         let wallet = EthereumWallet::from(signer);
-        let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
-            .wallet(wallet)
-            .on_http(rpc_url.parse().map_err(|_| error!("Could not parse rpc url"))?);
+        let provider = ProviderBuilder::new().with_recommended_fillers().wallet(wallet).on_http(
+            substrate_relayer_config
+                .node_rpc_url
+                .parse()
+                .map_err(|_| error!("Could not parse rpc url"))
+                .unwrap(),
+        );
 
         let bridge_instance = Bridge::new(
-            Address::from_slice(&decode(bridge_address).map_err(|_| error!("Can't decode bridge address"))?),
+            Address::from_slice(
+                &decode(substrate_relayer_config.bridge_contract_address)
+                    .map_err(|_| error!("Can't decode bridge address"))
+                    .unwrap(),
+            ),
             provider,
         );
 
-        Ok(Self { bridge_instance })
-    }
+        let bridge_contract_wrapper = BridgeContractWrapper { instance: bridge_instance };
 
-    pub fn get_address(&self) -> Address {
-        self.bridge_instance.provider().signer_addresses().next().unwrap()
+        let relayer: EthereumRelayer<BridgeContractWrapper> = EthereumRelayer::new(bridge_contract_wrapper).unwrap();
+        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+    }
+    relayers
+}
+
+/// Relays bridge request to smart contracts deployed on ethereum based network.
+#[allow(clippy::type_complexity)]
+pub struct EthereumRelayer<T: BridgeInterface> {
+    bridge_instance: T,
+}
+
+// TODO: We need to configure gas options
+#[allow(clippy::result_unit_err)]
+impl<T: BridgeInterface> EthereumRelayer<T> {
+    pub fn new(bridge_instance: T) -> Result<Self, ()> {
+        Ok(Self { bridge_instance })
     }
 }
 
 #[async_trait]
-impl Relayer for EthereumRelayer {
+impl<T: BridgeInterface + Send + Sync> Relayer for EthereumRelayer<T> {
     async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), ()> {
         debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
 
@@ -142,10 +162,40 @@ impl Relayer for EthereumRelayer {
         debug!("Call data: {:?}", call_data);
 
         // domainId 0 - heima
-        let proposal_builder = self.bridge_instance.voteProposal(0, nonce, resource_id, call_data);
+        self.bridge_instance.vote_proposal(0, nonce, resource_id, call_data).await;
 
-        proposal_builder.send().await.unwrap().watch().await.unwrap();
         debug!("Proposal relayed");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::{BridgeInterface, EthereumRelayer};
+    use alloy::primitives::{Bytes, FixedBytes};
+    use async_trait::async_trait;
+    use bridge_core::relay::Relayer;
+
+    pub struct MockedBridgeInterface {}
+
+    #[async_trait]
+    impl BridgeInterface for MockedBridgeInterface {
+        async fn vote_proposal(
+            &self,
+            domain_id: u8,
+            deposit_nonce: u64,
+            resource_id: FixedBytes<32>,
+            call_data: Bytes,
+        ) {
+        }
+    }
+
+    #[tokio::test]
+    pub async fn should_return_error_if_wrong_address_len() {
+        let bridge_instance = MockedBridgeInterface {};
+        let relayer = EthereumRelayer::new(bridge_instance).unwrap();
+
+        let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec()).await;
+        assert!(result.is_err());
     }
 }
