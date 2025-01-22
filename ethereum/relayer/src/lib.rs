@@ -119,6 +119,11 @@ impl Relayer for EthereumRelayer {
         let amount = DynSolValue::Uint(U256::from(amount), 32).abi_encode();
         let address_len = DynSolValue::Uint(U256::from(data.len()), 32).abi_encode();
 
+        if data.len() != 20 {
+            error!("Could not relay due to wrong data length");
+            return Err(());
+        }
+
         let mut address_bytes = [0; 32];
         address_bytes[0..20].copy_from_slice(&data);
 
