@@ -314,6 +314,15 @@ contract Bridge is Pausable, AccessControl, SafeMath {
     function _totalRelayers() public view returns (uint) {
         return AccessControl.getRoleMemberCount(RELAYER_ROLE);
     }
+    
+    /**
+        @notice Changes expiry.
+        @notice Only callable by admin.
+        @param newExpiry Value {_expiry} will be updated to.
+     */
+    function adminExpiry(uint256 newExpiry) external onlyAdmin {
+        _expiry = newExpiry.toUint40();
+    }
 
     /**
         @notice Changes deposit fee.
