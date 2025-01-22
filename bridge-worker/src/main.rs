@@ -229,7 +229,7 @@ fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result
     )?;
 
     Ok(thread::Builder::new()
-        .name(context.id.to_string())
+        .name(format!("{}_sync", &context.id).to_string())
         .spawn(move || eth_listener.sync())
         .unwrap())
 }
