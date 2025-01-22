@@ -48,7 +48,6 @@ COPY --from=build /usr/src/omni-bridge/target/release/bridge-worker /usr/src/omn
 COPY --from=build /usr/src/omni-bridge/omni-bridge.sig /usr/src/omni-bridge/omni-bridge.sig
 COPY --from=build /usr/src/omni-bridge/omni-bridge.manifest.sgx /usr/src/omni-bridge/omni-bridge.manifest.sgx
 
-COPY --from=build /usr/src/omni-bridge/config.json /usr/src/omni-bridge/config.json
 COPY --from=build /usr/src/omni-bridge/auth_key_pub.bin /usr/src/omni-bridge/auth_key_pub.bin
 
 ENTRYPOINT ["gramine-sgx", "omni-bridge"]

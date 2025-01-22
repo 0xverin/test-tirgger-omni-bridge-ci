@@ -1,4 +1,3 @@
-# Copyright (C) 2023 Gramine contributors
 # SPDX-License-Identifier: BSD-3-Clause
 
 # Rust manifest example
@@ -20,7 +19,7 @@ fs.mounts = [
   { path = "{{ arch_libdir }}", uri = "file:{{ arch_libdir }}" },
   { path = "/etc", uri = "file:/etc" },
   { path = "/usr", uri = "file:/usr" },
-  { path = "/config.json", uri = "file:config.json" },
+  { path = "/config.json", uri = "file:config/config.json" },
   { path = "/keystore", uri = "file:keystore", type="encrypted", key_name="{{'_sgx_mrsigner' if env.get('SGX', '0') == '1' else 'fake_sgx_mrsigner'}}" },
   { path = "/data", uri = "file:data", type="encrypted", key_name="{{'_sgx_mrsigner' if env.get('SGX', '0') == '1' else 'fake_sgx_mrsigner'}}" },
   { path = "/auth_key_pub.bin", uri = "file:auth_key_pub.bin" },
@@ -40,8 +39,11 @@ sgx.trusted_files = [
   "file:{{ arch_libdir }}/",
   "file:/etc/ssl/certs/ca-certificates.crt",
   "file:/usr/lib/ssl/certs/ca-certificates.crt",
-  "file:config.json",
   "file:auth_key_pub.bin",
+]
+
+sgx.allowed_files = [
+  "file:config/config.json",
 ]
 
 # The maximum number of threads in a single process needs to be declared in advance.

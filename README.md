@@ -23,6 +23,5 @@ An example can be found in `scripts/test-e2e-bridge.sh`.
 
 ### Preparing Gramine docker image
 
-1. Create `config.json` file in the root of the repository. This file should contain bridge configuration (see `local/config.json`)
-2. Create `auth_key_pub.bin` file containing keystore importer public key.
-3. Build docker image `docker build --secret id=signer,src=<path to enclave signing key> -f Dockerfile.gramine --tag litentry/omni-bridge:latest .`
+1. Create `auth_key_pub.bin` file containing keystore importer public key.
+2. Build docker image `docker build --secret id=signer,src=<path to enclave signing key> -f Dockerfile.gramine --tag litentry/omni-bridge:latest .`
