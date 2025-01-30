@@ -206,7 +206,7 @@ async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConf
 
     Ok(thread::Builder::new()
         .name(format!("{}_sync", &context.id).to_string())
-        .spawn(move || substrate_listener.sync())
+        .spawn(move || substrate_listener.sync().unwrap())
         .unwrap())
 }
 
@@ -230,7 +230,7 @@ fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result
 
     Ok(thread::Builder::new()
         .name(format!("{}_sync", &context.id).to_string())
-        .spawn(move || eth_listener.sync())
+        .spawn(move || eth_listener.sync().unwrap())
         .unwrap())
 }
 

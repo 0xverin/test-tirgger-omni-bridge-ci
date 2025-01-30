@@ -106,13 +106,15 @@ mod test {
     use super::{Fetcher, EVENT_TOPIC};
 
     use crate::listener::{EthereumPayInEvent, PayInEventId};
+    use crate::primitives::Log;
     use crate::primitives::LogId;
-    use crate::{primitives::Log, rpc_client::mocks::MockedRpcClientBuilder};
+    use crate::rpc_client::MockEthereumRpcClient;
     use alloy::dyn_abi::DynSolValue;
     use alloy::primitives::{keccak256, Address, Bytes, U160, U256};
     use alloy::sol_types::SolValue;
     use bridge_core::fetcher::BlockPayInEventsFetcher;
     use bridge_core::listener::PayIn;
+    use mockall::predicate::{always, eq};
     use std::collections::{HashMap, HashSet};
 
     #[tokio::test]
@@ -120,7 +122,6 @@ mod test {
         // given
         let source = Address::from(U160::from(150));
         let mut pay_in_events: HashMap<u64, Vec<EthereumPayInEvent>> = HashMap::new();
-        let mut logs: HashMap<u64, Vec<Log>> = HashMap::new();
 
         let event_data = U256::from(10).abi_encode();
 
@@ -141,9 +142,6 @@ mod test {
         }];
         let block_2_logs: Vec<Log> = vec![];
 
-        logs.insert(1, block_1_logs);
-        logs.insert(2, block_2_logs);
-
         let block_1_pay_in_events: Vec<EthereumPayInEvent> =
             vec![PayIn::new(PayInEventId::new(1, 1, 1), Some(source), 10, 1, [0; 32], event_data)];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
@@ -151,7 +149,20 @@ mod test {
         pay_in_events.insert(1, block_1_pay_in_events.clone());
         pay_in_events.insert(2, block_2_pay_in_events.clone());
 
-        let rpc_client = MockedRpcClientBuilder::new().with_block_logs(logs).build();
+        let mut rpc_client = MockEthereumRpcClient::new();
+
+        rpc_client
+            .expect_get_block_logs()
+            .with(eq(1), always(), always())
+            .times(1)
+            .returning(move |_, _, _| Box::pin(futures::future::ok(block_1_logs.clone())));
+
+        rpc_client
+            .expect_get_block_logs()
+            .with(eq(2), always(), always())
+            .times(1)
+            .returning(move |_, _, _| Box::pin(futures::future::ok(block_2_logs.clone())));
+
         let mut fetcher = Fetcher::new(0, rpc_client, HashSet::from_iter(vec![source]));
 
         // when and then -.-

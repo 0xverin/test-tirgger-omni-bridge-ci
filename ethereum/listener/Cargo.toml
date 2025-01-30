@@ -15,3 +15,5 @@ bridge-core = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
+futures = { workspace = true }
+mockall = { workspace = true }

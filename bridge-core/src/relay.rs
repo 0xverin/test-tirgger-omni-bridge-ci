@@ -17,7 +17,9 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc;
+
+#[cfg(test)]
+use mockall::automock;
 
 /// Represents relayers assigned to `Listener` instance. For example PayIns from different smart contracts deployed on same EVM
 /// network may be relayed to different destination chains. Strictly speaking there is a correlation between event emitter and relayer.
@@ -28,25 +30,12 @@ pub enum Relay<Id> {
 
 /// Used to relay bridging request to destination chain
 #[async_trait]
+#[cfg_attr(test, automock)]
 pub trait Relayer: Send {
-    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), ()>;
+    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), RelayError>;
 }
 
-#[allow(dead_code)]
-pub struct MockRelayer {
-    sender: mpsc::UnboundedSender<()>,
-}
-
-impl MockRelayer {
-    pub fn new() -> (Self, mpsc::UnboundedReceiver<()>) {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        (Self { sender }, receiver)
-    }
-}
-
-#[async_trait]
-impl Relayer for MockRelayer {
-    async fn relay(&self, _amount: u128, _nonce: u64, _resource_id: [u8; 32], _data: Vec<u8>) -> Result<(), ()> {
-        self.sender.send(()).map_err(|_| ())
-    }
+pub enum RelayError {
+    TransportError,
+    Other,
 }

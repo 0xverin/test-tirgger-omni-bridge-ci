@@ -18,7 +18,7 @@ use crate::key_store::SubstrateKeyStore;
 use async_trait::async_trait;
 use bridge_core::config::BridgeConfig;
 use bridge_core::key_store::KeyStore;
-use bridge_core::relay::Relayer;
+use bridge_core::relay::{RelayError, Relayer};
 use log::*;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -76,7 +76,7 @@ impl<T: Config> SubstrateRelayer<T> {
 
 #[async_trait]
 impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], _data: Vec<u8>) -> Result<(), ()> {
+    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], _data: Vec<u8>) -> Result<(), RelayError> {
         let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
         let account: AccountId32 = AccountId32::from(account_bytes);
         debug!("Relaying amount: {} with nonce: {} to account: {:?}", amount, nonce, account);
@@ -98,17 +98,25 @@ impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
             .await
             .map_err(|e| {
                 error!("Could not connect to node: {:?}", e);
+                RelayError::TransportError
             })?;
         let secret_key_bytes = self.key_store.read().map_err(|e| {
             error!("Could not unseal key: {:?}", e);
+            RelayError::Other
         })?;
         let signer = subxt_signer::sr25519::Keypair::from_secret_key(secret_key_bytes).map_err(|e| {
             error!("Could not create secret key: {:?}", e);
+            RelayError::Other
         })?;
 
-        let hash = api.tx().sign_and_submit(&call, &signer, Default::default()).await.map_err(|e| {
-            error!("Could not submit tx: {:?}", e);
-        });
+        let hash = api
+            .tx()
+            .sign_and_submit(&call, &signer, Default::default())
+            .await
+            .map_err(|e| {
+                error!("Could not submit tx: {:?}", e);
+                RelayError::TransportError
+            })?;
 
         debug!("Relayed pay out request with hash: {:?}", hash);
 

@@ -92,26 +92,6 @@ impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
     }
 }
 
-#[derive(Default)]
-pub struct MockedRpcClientBuilder {
-    _block_num: Option<u64>,
-}
-
-pub struct MockedRpcClient {
-    block_num: u64,
-}
-
-#[async_trait]
-impl SubstrateRpcClient for MockedRpcClient {
-    async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()> {
-        Ok(self.block_num)
-    }
-
-    async fn get_block_pay_in_events(&mut self, _block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
-        Ok(vec![])
-    }
-}
-
 #[async_trait]
 pub trait SubstrateRpcClientFactory<RpcClient: SubstrateRpcClient> {
     async fn new_client(&self) -> Result<RpcClient, ()>;

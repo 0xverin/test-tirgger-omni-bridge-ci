@@ -21,6 +21,7 @@ use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
 use crate::config::BridgeConfig;
 use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
+use crate::relay::RelayError;
 use crate::{
     relay::Relay,
     sync_checkpoint_repository::{Checkpoint, CheckpointRepository},
@@ -150,7 +151,7 @@ impl<
     }
 
     /// Start syncing. It's a long-running blocking operation - should be started in dedicated thread.
-    pub fn sync(&mut self) {
+    pub fn sync(&mut self) -> Result<(), ()> {
         log::info!("Starting {} network sync, start block: {}", self.id, self.start_block);
         let mut block_number_to_sync =
             if let Some(ref checkpoint) = self.checkpoint_repository.get().expect("Could not read checkpoint") {
@@ -175,7 +176,7 @@ impl<
         'main: loop {
             log::debug!("Starting syncing block: {}", block_number_to_sync);
             if self.stop_signal.try_recv().is_ok() {
-                break;
+                return Ok(());
             }
 
             let maybe_last_finalized_block = match self.handle.block_on(self.fetcher.get_last_finalized_block_num()) {
@@ -224,31 +225,43 @@ impl<
                                 {
                                     if checkpoint.lt(&event.id.clone().into()) {
                                         log::info!("Relaying");
-                                        if self
-                                            .handle
-                                            .block_on(relayer.relay(
-                                                event.amount,
-                                                event.nonce,
-                                                event.resource_id,
-                                                event.data,
-                                            ))
-                                            .is_err()
-                                        {
-                                            log::info!("Could not relay");
-                                            sleep(Duration::from_secs(1));
-                                            continue 'main;
+
+                                        match self.handle.block_on(relayer.relay(
+                                            event.amount,
+                                            event.nonce,
+                                            event.resource_id,
+                                            event.data,
+                                        )) {
+                                            Err(RelayError::TransportError) => {
+                                                log::info!("Could not relay due to TransportError, will try again...");
+                                                sleep(Duration::from_secs(1));
+                                                continue 'main;
+                                            },
+                                            Err(RelayError::Other) => {
+                                                panic!("Unexpected error occurred during relaying");
+                                            },
+                                            _ => {},
                                         }
                                     } else {
                                         log::debug!("Skipping event");
                                     }
-                                } else if self
-                                    .handle
-                                    .block_on(relayer.relay(event.amount, event.nonce, event.resource_id, event.data))
-                                    .is_err()
-                                {
-                                    log::info!("Could not relay");
-                                    sleep(Duration::from_secs(1));
-                                    continue 'main;
+                                } else {
+                                    match self.handle.block_on(relayer.relay(
+                                        event.amount,
+                                        event.nonce,
+                                        event.resource_id,
+                                        event.data,
+                                    )) {
+                                        Err(RelayError::TransportError) => {
+                                            log::info!("Could not relay due to TransportError, will try again...");
+                                            sleep(Duration::from_secs(1));
+                                            continue 'main;
+                                        },
+                                        Err(RelayError::Other) => {
+                                            return Err(());
+                                        },
+                                        _ => {},
+                                    }
                                 }
                             }
                             self.checkpoint_repository
@@ -276,5 +289,200 @@ impl<
                 log::trace!("Fast sync skipping 1s wait");
             }
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
+    use crate::listener::{Listener, PayIn};
+    use crate::relay::{MockRelayer, Relay, RelayError};
+    use crate::sync_checkpoint_repository::{Checkpoint, InMemoryCheckpointRepository};
+    use async_trait::async_trait;
+    use mockall::predicate::eq;
+    use mockall::*;
+    use std::cmp::Ordering;
+    use std::thread;
+    use tokio::runtime::Handle;
+
+    mock! {
+        Fetcher {}
+        #[async_trait]
+        impl LastFinalizedBlockNumFetcher for Fetcher {
+            async fn get_last_finalized_block_num(&mut self) -> Result<Option<u64>, ()>;
+        }
+        #[async_trait]
+        impl BlockPayInEventsFetcher<u64, ()> for Fetcher {
+            async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<u64, ()>>, ()>;
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct SimpleCheckpoint {
+        block_num: u64,
+    }
+
+    impl PartialEq<Self> for SimpleCheckpoint {
+        fn eq(&self, other: &Self) -> bool {
+            self.block_num == other.block_num
+        }
+    }
+
+    impl PartialOrd for SimpleCheckpoint {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            if self.block_num > other.block_num {
+                Some(Ordering::Greater)
+            } else if self.block_num < other.block_num {
+                Some(Ordering::Less)
+            } else {
+                Some(Ordering::Equal)
+            }
+        }
+    }
+
+    impl Checkpoint for SimpleCheckpoint {
+        fn just_block_num(&self) -> bool {
+            true
+        }
+
+        fn get_block_num(&self) -> u64 {
+            self.block_num
+        }
+    }
+
+    impl From<u64> for SimpleCheckpoint {
+        fn from(value: u64) -> Self {
+            SimpleCheckpoint { block_num: value }
+        }
+    }
+
+    #[tokio::test]
+    pub async fn sync_should_start_syncing_from_last_saved_log() {
+        let handle = Handle::current();
+        let mut relayer = MockRelayer::new();
+        relayer
+            .expect_relay()
+            .times(2)
+            .returning(|_, _, _, _| Box::pin(futures::future::ready(Ok(()))));
+        let relay = Relay::Single(Box::new(relayer));
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(0))
+            .times(0)
+            .returning(|_| Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(1))
+            .times(0)
+            .returning(|_| Ok(vec![PayIn::new(1, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(2))
+            .times(1)
+            .returning(|_| Ok(vec![PayIn::new(2, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(3))
+            .times(1)
+            .returning(|_| Ok(vec![PayIn::new(3, None, 0, 0, [0; 32], vec![])]));
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(Some(SimpleCheckpoint { block_num: 1 }));
+
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            assert!(result.is_ok());
+        });
+
+        // give a listener some time to make a couple of tries
+        thread::sleep(std::time::Duration::from_secs(3));
+
+        // stop listener
+        tx.send(()).unwrap();
+
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    pub async fn sync_should_stop_in_case_of_relaying_other_error() {
+        let handle = Handle::current();
+
+        let mut relayer = MockRelayer::new();
+        relayer
+            .expect_relay()
+            .times(1)
+            .returning(|_, _, _, _| Box::pin(futures::future::ready(Err(RelayError::Other))));
+        let relay = Relay::Single(Box::new(relayer));
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(1).returning(|| Ok(Some(3)));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(0))
+            .times(1)
+            .returning(|_| Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![])]));
+
+        let (_, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(None);
+
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            assert!(result.is_err());
+        });
+
+        // give a listener some time to make a couple of tries
+        thread::sleep(std::time::Duration::from_secs(3));
+
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    pub async fn sync_should_retry_relaying_in_case_of_relaying_transport_error() {
+        let handle = Handle::current();
+
+        let mut relayer = MockRelayer::new();
+        relayer
+            .expect_relay()
+            .times(3)
+            .returning(|_, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
+        let relay = Relay::Single(Box::new(relayer));
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(0))
+            .times(3)
+            .returning(|_| Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![])]));
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(None);
+
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            assert!(result.is_ok());
+        });
+
+        // give a listener some time to make a couple of tries
+        thread::sleep(std::time::Duration::from_secs(3));
+
+        // stop listener
+        tx.send(()).unwrap();
+
+        handle.join().unwrap();
     }
 }

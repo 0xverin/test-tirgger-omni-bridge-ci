@@ -11,4 +11,6 @@ log = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["test-util"]}
+tokio = { workspace = true, features = ["test-util"] }
+mockall = { workspace = true }
+futures = { workspace = true }

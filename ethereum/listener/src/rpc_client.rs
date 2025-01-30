@@ -23,6 +23,9 @@ use crate::primitives::{Log, LogId};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::rpc::types::Filter;
 
+#[cfg(test)]
+use mockall::automock;
+
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -34,6 +37,7 @@ use alloy::sol;
 
 /// For fetching data from Ethereum RPC node
 #[async_trait]
+#[cfg_attr(test, automock)]
 pub trait EthereumRpcClient {
     async fn get_block_number(&self) -> Result<u64, ()>;
     async fn get_block_logs(&self, block_number: u64, addresses: Vec<Address>, event: &str) -> Result<Vec<Log>, ()>;
@@ -85,67 +89,5 @@ impl EthereumRpcClient for EthersRpcClient {
                     .collect()
             })
             .map_err(|_| ())
-    }
-}
-
-#[cfg(test)]
-pub mod mocks {
-    use std::collections::HashMap;
-
-    use alloy::primitives::Address;
-    use async_trait::async_trait;
-
-    use crate::primitives::Log;
-
-    use super::EthereumRpcClient;
-
-    #[derive(Default)]
-    pub struct MockedRpcClientBuilder {
-        block_number: Option<u64>,
-        block_logs: Option<HashMap<u64, Vec<Log>>>,
-    }
-
-    impl MockedRpcClientBuilder {
-        pub fn new() -> Self {
-            Default::default()
-        }
-
-        pub fn with_block_number(mut self, block_number: u64) -> Self {
-            self.block_number = Some(block_number);
-            self
-        }
-
-        pub fn with_block_logs(mut self, block_logs: HashMap<u64, Vec<Log>>) -> Self {
-            self.block_logs = Some(block_logs);
-            self
-        }
-
-        pub fn build(self) -> MockedRpcClient {
-            MockedRpcClient {
-                block_number: self.block_number.unwrap_or_default(),
-                block_logs: self.block_logs.unwrap_or_default(),
-            }
-        }
-    }
-
-    pub struct MockedRpcClient {
-        block_number: u64,
-        block_logs: HashMap<u64, Vec<Log>>,
-    }
-
-    #[async_trait]
-    impl EthereumRpcClient for MockedRpcClient {
-        async fn get_block_number(&self) -> Result<u64, ()> {
-            Ok(self.block_number)
-        }
-
-        async fn get_block_logs(
-            &self,
-            block_number: u64,
-            _addresses: Vec<Address>,
-            _event: &str,
-        ) -> Result<Vec<Log>, ()> {
-            self.block_logs.get(&block_number).map(|logs| logs.to_owned()).ok_or(())
-        }
     }
 }

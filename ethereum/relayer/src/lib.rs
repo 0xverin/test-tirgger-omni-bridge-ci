@@ -21,17 +21,21 @@ use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
-use alloy::providers::{Identity, ProviderBuilder, RootProvider};
-use alloy::signers::local::PrivateKeySigner;
+use alloy::providers::{Identity, PendingTransactionError, ProviderBuilder, RootProvider};
+use alloy::signers::k256::ecdsa::SigningKey;
+use alloy::signers::local::{LocalSigner, PrivateKeySigner};
 use alloy::sol;
 use alloy::transports::http::{Client, Http};
 use async_trait::async_trait;
 use bridge_core::config::BridgeConfig;
 use bridge_core::key_store::KeyStore;
-use bridge_core::relay::Relayer;
+use bridge_core::relay::{RelayError, Relayer};
 use log::{debug, error};
 use serde::Deserialize;
 use std::collections::HashMap;
+
+#[cfg(test)]
+use mockall::automock;
 
 pub mod key_store;
 
@@ -43,31 +47,68 @@ sol!(
 );
 
 #[async_trait]
+#[cfg_attr(test, automock)]
 pub trait BridgeInterface {
-    async fn vote_proposal(&self, domain_id: u8, deposit_nonce: u64, resource_id: FixedBytes<32>, call_data: Bytes);
+    async fn vote_proposal(
+        &self,
+        domain_id: u8,
+        deposit_nonce: u64,
+        resource_id: FixedBytes<32>,
+        call_data: Bytes,
+    ) -> Result<(), RelayError>;
 }
+
+type BridgeInstanceType = BridgeInstance<
+    Http<Client>,
+    FillProvider<
+        JoinFill<
+            JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
+            WalletFiller<EthereumWallet>,
+        >,
+        RootProvider<Http<Client>>,
+        Http<Client>,
+        Ethereum,
+    >,
+>;
 
 #[allow(clippy::type_complexity)]
 pub struct BridgeContractWrapper {
-    instance: BridgeInstance<
-        Http<Client>,
-        FillProvider<
-            JoinFill<
-                JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
-                WalletFiller<EthereumWallet>,
-            >,
-            RootProvider<Http<Client>>,
-            Http<Client>,
-            Ethereum,
-        >,
-    >,
+    instance: BridgeInstanceType,
 }
 
 #[async_trait]
 impl BridgeInterface for BridgeContractWrapper {
-    async fn vote_proposal(&self, domain_id: u8, deposit_nonce: u64, resource_id: FixedBytes<32>, call_data: Bytes) {
+    async fn vote_proposal(
+        &self,
+        domain_id: u8,
+        deposit_nonce: u64,
+        resource_id: FixedBytes<32>,
+        call_data: Bytes,
+    ) -> Result<(), RelayError> {
         let proposal_builder = self.instance.voteProposal(domain_id, deposit_nonce, resource_id, call_data);
-        proposal_builder.send().await.unwrap().watch().await.unwrap();
+        let tx_hash = proposal_builder
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Could not send proposal vote: {:?}", e);
+                if matches!(e, alloy::contract::Error::TransportError(_)) {
+                    RelayError::TransportError
+                } else {
+                    RelayError::Other
+                }
+            })?
+            .watch()
+            .await
+            .map_err(|e| {
+                error!("Could not watch proposal vote: {:?}", e);
+                if matches!(e, PendingTransactionError::TransportError(_)) {
+                    RelayError::TransportError
+                } else {
+                    RelayError::Other
+                }
+            })?;
+        log::debug!("Submitted vote proposal, tx_hash: {:?}", tx_hash);
+        Ok(())
     }
 }
 
@@ -88,22 +129,10 @@ pub fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> HashMa
             PrivateKeySigner::from(key_store.read().map_err(|e| error!("Can't read key store: {:?}", e)).unwrap());
         log::info!("Ethereum relayer address: {:?}", signer.address());
 
-        let wallet = EthereumWallet::from(signer);
-        let provider = ProviderBuilder::new().with_recommended_fillers().wallet(wallet).on_http(
-            substrate_relayer_config
-                .node_rpc_url
-                .parse()
-                .map_err(|_| error!("Could not parse rpc url"))
-                .unwrap(),
-        );
-
-        let bridge_instance = Bridge::new(
-            Address::from_slice(
-                &decode(substrate_relayer_config.bridge_contract_address)
-                    .map_err(|_| error!("Can't decode bridge address"))
-                    .unwrap(),
-            ),
-            provider,
+        let bridge_instance = prepare_bridge_instance(
+            signer,
+            &substrate_relayer_config.node_rpc_url,
+            &substrate_relayer_config.bridge_contract_address,
         );
 
         let bridge_contract_wrapper = BridgeContractWrapper { instance: bridge_instance };
@@ -130,7 +159,7 @@ impl<T: BridgeInterface> EthereumRelayer<T> {
 
 #[async_trait]
 impl<T: BridgeInterface + Send + Sync> Relayer for EthereumRelayer<T> {
-    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), ()> {
+    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), RelayError> {
         debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
 
         // resource id 0
@@ -141,7 +170,7 @@ impl<T: BridgeInterface + Send + Sync> Relayer for EthereumRelayer<T> {
 
         if data.len() != 20 {
             error!("Could not relay due to wrong data length");
-            return Err(());
+            return Err(RelayError::Other);
         }
 
         let mut address_bytes = [0; 32];
@@ -162,40 +191,67 @@ impl<T: BridgeInterface + Send + Sync> Relayer for EthereumRelayer<T> {
         debug!("Call data: {:?}", call_data);
 
         // domainId 0 - heima
-        self.bridge_instance.vote_proposal(0, nonce, resource_id, call_data).await;
+        self.bridge_instance.vote_proposal(0, nonce, resource_id, call_data).await?;
 
         debug!("Proposal relayed");
         Ok(())
     }
 }
 
+pub fn prepare_bridge_instance(
+    signer: LocalSigner<SigningKey>,
+    rpc_url: &str,
+    bridge_contract_address: &str,
+) -> BridgeInstanceType {
+    let wallet = EthereumWallet::from(signer);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(rpc_url.parse().map_err(|_| error!("Could not parse rpc url")).unwrap());
+
+    Bridge::new(
+        Address::from_slice(
+            &decode(bridge_contract_address)
+                .map_err(|_| error!("Can't decode bridge address"))
+                .unwrap(),
+        ),
+        provider,
+    )
+}
+
 #[cfg(test)]
 pub mod tests {
-    use crate::{BridgeInterface, EthereumRelayer};
+    use crate::{
+        prepare_bridge_instance, BridgeContractWrapper, BridgeInterface, EthereumRelayer, MockBridgeInterface,
+    };
     use alloy::primitives::{Bytes, FixedBytes};
-    use async_trait::async_trait;
-    use bridge_core::relay::Relayer;
-
-    pub struct MockedBridgeInterface {}
-
-    #[async_trait]
-    impl BridgeInterface for MockedBridgeInterface {
-        async fn vote_proposal(
-            &self,
-            domain_id: u8,
-            deposit_nonce: u64,
-            resource_id: FixedBytes<32>,
-            call_data: Bytes,
-        ) {
-        }
-    }
+    use alloy::signers::local::PrivateKeySigner;
+    use bridge_core::relay::{RelayError, Relayer};
 
     #[tokio::test]
     pub async fn should_return_error_if_wrong_address_len() {
-        let bridge_instance = MockedBridgeInterface {};
+        let mut bridge_instance = MockBridgeInterface::new();
+        bridge_instance
+            .expect_vote_proposal()
+            .returning(|_, _, _, _| Box::pin(futures::future::ok(())));
+
         let relayer = EthereumRelayer::new(bridge_instance).unwrap();
 
         let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec()).await;
-        assert!(result.is_err());
+        assert!(matches!(result, Err(RelayError::Other)));
+    }
+
+    #[tokio::test]
+    pub async fn vote_proposal_should_return_transport_error_if_node_unreachable() {
+        let bridge_instance = prepare_bridge_instance(
+            PrivateKeySigner::random(),
+            "http://localhost:8545",
+            "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        );
+        let wrapper = BridgeContractWrapper { instance: bridge_instance };
+        let result = wrapper
+            .vote_proposal(0, 1, FixedBytes::from_slice(&[0u8; 32]), Bytes::from(vec![]))
+            .await;
+        assert!(matches!(result, Err(RelayError::TransportError)));
     }
 }

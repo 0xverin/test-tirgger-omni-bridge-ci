@@ -16,3 +16,5 @@ ethereum-listener = { workspace = true }
 ethereum-relayer = { workspace = true }
 substrate-listener = { workspace = true }
 substrate-relayer = { workspace = true }
+mockall = { workspace = true }
+futures = { workspace = true }
