@@ -112,7 +112,7 @@ mod test {
     use alloy::dyn_abi::DynSolValue;
     use alloy::primitives::{keccak256, Address, Bytes, U160, U256};
     use alloy::sol_types::SolValue;
-    use bridge_core::fetcher::BlockPayInEventsFetcher;
+    use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
     use bridge_core::listener::PayIn;
     use mockall::predicate::{always, eq};
     use std::collections::{HashMap, HashSet};
@@ -168,5 +168,16 @@ mod test {
         // when and then -.-
         assert_eq!(block_1_pay_in_events, fetcher.get_block_pay_in_events(1).await.unwrap());
         assert_eq!(block_2_pay_in_events, fetcher.get_block_pay_in_events(2).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn it_should_take_gap_when_calculating_finalized_block() {
+        let mut rpc_client = MockEthereumRpcClient::new();
+        rpc_client
+            .expect_get_block_number()
+            .returning(|| Box::pin(futures::future::ok(10)));
+        let mut fetcher = Fetcher::new(6, rpc_client, HashSet::from_iter(vec![]));
+
+        assert_eq!(fetcher.get_last_finalized_block_num().await, Ok(Some(4)));
     }
 }

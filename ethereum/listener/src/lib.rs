@@ -42,7 +42,6 @@ pub fn create_listener(
     config: &ListenerConfig,
     start_block: u64,
     relays: Box<dyn Relayer>,
-    finalization_gap_blocks: u64,
     stop_signal: Receiver<()>,
 ) -> Result<EthereumListener<EthersRpcClient, FileCheckpointRepository>, ()> {
     let client = EthersRpcClient::new(&config.node_rpc_url).map_err(|e| {
@@ -51,9 +50,8 @@ pub fn create_listener(
 
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
-    // TODO: Values should be receieved via CLAP instead of hardcoding
     let fetcher: Fetcher<EthersRpcClient> = Fetcher::new(
-        finalization_gap_blocks,
+        config.finalization_gap,
         client,
         HashSet::from([Address::from_str(&config.bridge_contract_address).unwrap()]),
     );

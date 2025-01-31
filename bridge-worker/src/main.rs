@@ -211,22 +211,13 @@ async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConf
 }
 
 fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result<JoinHandle<()>, ()> {
-    let finalization_gap_blocks = 6;
-
     assert_eq!(context.relayers.len(), 1);
 
     let relayer: Box<dyn Relayer> = context.relayers.remove(0);
 
     let (_stop_sender, stop_receiver) = oneshot::channel();
-    let mut eth_listener = create_listener(
-        &context.id,
-        Handle::current(),
-        &context.config,
-        context.start_block,
-        relayer,
-        finalization_gap_blocks,
-        stop_receiver,
-    )?;
+    let mut eth_listener =
+        create_listener(&context.id, Handle::current(), &context.config, context.start_block, relayer, stop_receiver)?;
 
     Ok(thread::Builder::new()
         .name(format!("{}_sync", &context.id).to_string())
