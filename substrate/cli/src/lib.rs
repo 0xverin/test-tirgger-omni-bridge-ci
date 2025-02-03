@@ -22,6 +22,8 @@ use std::str::FromStr;
 use subxt::utils::AccountId32;
 use subxt::{OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::dev;
+use crate::litentry_rococo::system::events::ExtrinsicFailed;
+use crate::litentry_rococo::DispatchError;
 
 #[subxt::subxt(runtime_metadata_path = "../artifacts/local.scale")]
 pub mod litentry_rococo {}
@@ -31,6 +33,7 @@ pub enum SubstrateCommand {
     SetupBridge(SetupBridgeConf),
     PayIn(PayInConf),
     Balance(BalanceConf),
+    FailedBridgeTx,
 }
 
 #[derive(Args)]
@@ -171,5 +174,39 @@ pub async fn handle(command: &SubstrateCommand) {
 
             hash.wait_for_finalized().await.unwrap();
         },
+        SubstrateCommand::FailedBridgeTx => {
+            // Get the current finalized block number
+            let latest_block = api.blocks().at_latest().await.unwrap();
+            let mut current_block_hash = Some(latest_block.hash());
+
+            // Scan the last 10 blocks for failed tx extrinsic events
+            for _ in 0..10 {
+                if let Some(block_hash) = current_block_hash {
+                    let block = api.blocks().at(block_hash).await.unwrap();
+        
+                    // Fetch all events in the block
+                    let events = block.events().await.unwrap();
+                    for event in events.iter() {
+                        let details = event.unwrap();
+                        if let Ok(pallet_event) = details.as_event::<ExtrinsicFailed>() {
+                            if let Some(ExtrinsicFailed { dispatch_error, .. }) = pallet_event {
+                                if let DispatchError::Module(error) = dispatch_error {
+                                    if error.index == 85 && error.error[0] == 10 {
+                                        println!("ok");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+        
+                    // Get the parent hash to move to the previous block
+                    current_block_hash = Some(block.header().parent_hash);
+                } else {
+                    println!("Failed to find failed tx");
+                    break;
+                }
+            }
+        }
     }
 }

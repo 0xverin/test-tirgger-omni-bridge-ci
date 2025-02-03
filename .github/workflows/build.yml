@@ -63,3 +63,7 @@ jobs:
       - name: Run e2e test
         run: |
           make start-local-e2e-test
+      
+      - name: Test repeated block scannning 
+        run: | 
+          make test-repeated-block-scanning

@@ -74,6 +74,10 @@ start-local:
 start-local-e2e-test:
 	./scripts/test-e2e-bridge.sh
 
+.PHONY: test-repeated-block-scanning
+test-repeated-block-scanning:
+	./scripts/test-repeated-block-scanning.sh
+
 .PHONY: stop-local
 stop-local:
 	docker compose down
