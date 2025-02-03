@@ -27,13 +27,20 @@ use bridge_core::relay::{Relay, Relayer};
 use bridge_core::sync_checkpoint_repository::FileCheckpointRepository;
 use scale_encode::EncodeAsType;
 use subxt::config::signed_extensions;
+use subxt::events::StaticEvent;
 use subxt::Config;
 use tokio::runtime::Handle;
 use tokio::sync::oneshot::Receiver;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
-pub mod litentry_rococo {}
+#[subxt::subxt(runtime_metadata_path = "../artifacts/paseo.scale")]
+pub mod paseo {}
+
+#[subxt::subxt(runtime_metadata_path = "../artifacts/heima.scale")]
+pub mod heima {}
+
+#[subxt::subxt(runtime_metadata_path = "../artifacts/local.scale")]
+pub mod local {}
 
 // We don't need to construct this at runtime,
 // so an empty enum is appropriate:
@@ -65,19 +72,169 @@ impl Config for CustomConfig {
     type AssetId = u32;
 }
 
-/// Creates substrate based chain listener.
-pub async fn create_listener<ChainConfig: Config>(
+/// Creates local substrate based chain listener.
+pub async fn create_local_listener<ChainConfig: Config>(
     id: &str,
     handle: Handle,
     config: &ListenerConfig,
     start_block: u64,
     relayer: Box<dyn Relayer>,
     stop_signal: Receiver<()>,
-) -> Result<SubstrateListener<RpcClient<ChainConfig>, RpcClientFactory<ChainConfig>, FileCheckpointRepository>, ()> {
+) -> Result<
+    SubstrateListener<
+        RpcClient<ChainConfig, LocalPaidInEvent>,
+        RpcClientFactory<ChainConfig>,
+        FileCheckpointRepository,
+    >,
+    (),
+> {
     let client_factory: RpcClientFactory<ChainConfig> = RpcClientFactory::new(&config.ws_rpc_endpoint);
 
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
     Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+}
+
+/// Creates Paseo chain listener.
+pub async fn create_paseo_listener<ChainConfig: Config>(
+    id: &str,
+    handle: Handle,
+    config: &ListenerConfig,
+    start_block: u64,
+    relayer: Box<dyn Relayer>,
+    stop_signal: Receiver<()>,
+) -> Result<
+    SubstrateListener<
+        RpcClient<ChainConfig, PaseoPaidInEvent>,
+        RpcClientFactory<ChainConfig>,
+        FileCheckpointRepository,
+    >,
+    (),
+> {
+    let client_factory: RpcClientFactory<ChainConfig> = RpcClientFactory::new(&config.ws_rpc_endpoint);
+
+    let fetcher = Fetcher::new(client_factory);
+    let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
+
+    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+}
+
+/// Creates Heima chain listener.
+pub async fn create_heima_listener<ChainConfig: Config>(
+    id: &str,
+    handle: Handle,
+    config: &ListenerConfig,
+    start_block: u64,
+    relayer: Box<dyn Relayer>,
+    stop_signal: Receiver<()>,
+) -> Result<
+    SubstrateListener<
+        RpcClient<ChainConfig, HeimaPaidInEvent>,
+        RpcClientFactory<ChainConfig>,
+        FileCheckpointRepository,
+    >,
+    (),
+> {
+    let client_factory: RpcClientFactory<ChainConfig> = RpcClientFactory::new(&config.ws_rpc_endpoint);
+
+    let fetcher = Fetcher::new(client_factory);
+    let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
+
+    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+}
+
+pub trait PalletPaidInEvent: Send {
+    type MetadataType: StaticEvent;
+
+    fn wrap(raw: Self::MetadataType) -> Self;
+
+    fn amount(&self) -> u128;
+    fn resource_id(&self) -> [u8; 32];
+    fn dest_account(&self) -> Vec<u8>;
+    fn nonce(&self) -> u64;
+}
+
+pub struct HeimaPaidInEvent {
+    raw: heima::omni_bridge::events::PaidIn,
+}
+
+impl PalletPaidInEvent for HeimaPaidInEvent {
+    type MetadataType = heima::omni_bridge::events::PaidIn;
+
+    fn wrap(raw: Self::MetadataType) -> Self {
+        Self { raw }
+    }
+
+    fn amount(&self) -> u128 {
+        self.raw.amount
+    }
+
+    fn resource_id(&self) -> [u8; 32] {
+        self.raw.resource_id
+    }
+
+    fn dest_account(&self) -> Vec<u8> {
+        self.raw.dest_account.clone()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.raw.nonce
+    }
+}
+
+pub struct LocalPaidInEvent {
+    raw: local::omni_bridge::events::PaidIn,
+}
+
+impl PalletPaidInEvent for LocalPaidInEvent {
+    type MetadataType = local::omni_bridge::events::PaidIn;
+
+    fn wrap(raw: Self::MetadataType) -> Self {
+        Self { raw }
+    }
+
+    fn amount(&self) -> u128 {
+        self.raw.amount
+    }
+
+    fn resource_id(&self) -> [u8; 32] {
+        self.raw.resource_id
+    }
+
+    fn dest_account(&self) -> Vec<u8> {
+        self.raw.dest_account.clone()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.raw.nonce
+    }
+}
+
+pub struct PaseoPaidInEvent {
+    raw: paseo::omni_bridge::events::PaidIn,
+}
+
+impl PalletPaidInEvent for PaseoPaidInEvent {
+    type MetadataType = paseo::omni_bridge::events::PaidIn;
+
+    fn wrap(raw: Self::MetadataType) -> Self {
+        Self { raw }
+    }
+
+    fn amount(&self) -> u128 {
+        self.raw.amount
+    }
+
+    fn resource_id(&self) -> [u8; 32] {
+        self.raw.resource_id
+    }
+
+    fn dest_account(&self) -> Vec<u8> {
+        self.raw.dest_account.clone()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.raw.nonce
+    }
 }

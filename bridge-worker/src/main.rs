@@ -132,7 +132,7 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
         prepare_listener_context(&config, "substrate", &mut relayers, &start_blocks);
     for substrate_listener_context in substrate_listener_contexts {
         // todo: remove unwrap ??
-        handles.push(sync_litentry_rococo(substrate_listener_context).await.unwrap())
+        handles.push(sync_substrate(substrate_listener_context).await.unwrap())
     }
 
     for handle in handles {
@@ -186,7 +186,7 @@ fn build_import(arg: &ImportArgs) {
     build_import_internal(arg.ethereum_id.clone(), arg.ethereum_relayer_key_path.clone(), &shielding_key, &auth_key);
 }
 
-async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConfig>) -> Result<JoinHandle<()>, ()> {
+async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -> Result<JoinHandle<()>, ()> {
     let (_sub_stop_sender, sub_stop_receiver) = oneshot::channel();
 
     //todo: for now we assume there is only one relayer =]
@@ -194,20 +194,54 @@ async fn sync_litentry_rococo(mut context: ListenerContext<SubstrateListenerConf
 
     let relayer: Box<dyn Relayer> = context.relayers.remove(0);
 
-    let mut substrate_listener = substrate_listener::create_listener::<CustomConfig>(
-        &context.id,
-        Handle::current(),
-        &context.config,
-        context.start_block,
-        relayer,
-        sub_stop_receiver,
-    )
-    .await?;
-
-    Ok(thread::Builder::new()
-        .name(format!("{}_sync", &context.id).to_string())
-        .spawn(move || substrate_listener.sync().unwrap())
-        .unwrap())
+    match context.config.chain.as_str() {
+        "local" => {
+            let mut listener = substrate_listener::create_local_listener::<CustomConfig>(
+                &context.id,
+                Handle::current(),
+                &context.config,
+                context.start_block,
+                relayer,
+                sub_stop_receiver,
+            )
+            .await?;
+            Ok(thread::Builder::new()
+                .name(format!("{}_sync", &context.id).to_string())
+                .spawn(move || listener.sync().unwrap())
+                .unwrap())
+        },
+        "paseo" => {
+            let mut listener = substrate_listener::create_paseo_listener::<CustomConfig>(
+                &context.id,
+                Handle::current(),
+                &context.config,
+                context.start_block,
+                relayer,
+                sub_stop_receiver,
+            )
+            .await?;
+            Ok(thread::Builder::new()
+                .name(format!("{}_sync", &context.id).to_string())
+                .spawn(move || listener.sync().unwrap())
+                .unwrap())
+        },
+        "heima" => {
+            let mut listener = substrate_listener::create_heima_listener::<CustomConfig>(
+                &context.id,
+                Handle::current(),
+                &context.config,
+                context.start_block,
+                relayer,
+                sub_stop_receiver,
+            )
+            .await?;
+            Ok(thread::Builder::new()
+                .name(format!("{}_sync", &context.id).to_string())
+                .spawn(move || listener.sync().unwrap())
+                .unwrap())
+        },
+        _ => panic!("Unknown chain: {}", context.config.chain),
+    }
 }
 
 fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result<JoinHandle<()>, ()> {

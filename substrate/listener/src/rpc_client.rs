@@ -15,6 +15,7 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::primitives::EventId;
+use crate::PalletPaidInEvent;
 use async_trait::async_trait;
 use std::marker::PhantomData;
 use subxt::backend::legacy::LegacyRpcMethods;
@@ -48,15 +49,18 @@ pub trait SubstrateRpcClient {
     async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()>;
 }
 
-pub struct RpcClient<ChainConfig: Config> {
+pub struct RpcClient<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent> {
     legacy: LegacyRpcMethods<ChainConfig>,
     events: EventsClient<ChainConfig, OnlineClient<ChainConfig>>,
+    phantom_data: PhantomData<PalletPaidInEventType>,
 }
 
-impl<ChainConfig: Config> RpcClient<ChainConfig> {}
+impl<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent> RpcClient<ChainConfig, PalletPaidInEventType> {}
 
 #[async_trait]
-impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
+impl<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent> SubstrateRpcClient
+    for RpcClient<ChainConfig, PalletPaidInEventType>
+{
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()> {
         let finalized_header = self.legacy.chain_get_finalized_head().await.map_err(|_| ())?;
         match self.legacy.chain_get_header(Some(finalized_header)).await.map_err(|_| ())? {
@@ -69,19 +73,19 @@ impl<ChainConfig: Config> SubstrateRpcClient for RpcClient<ChainConfig> {
             Some(hash) => {
                 let events = self.events.at(BlockRef::from_hash(hash)).await.map_err(|_| ())?;
 
-                let pay_in_events = events.find::<crate::litentry_rococo::omni_bridge::events::PaidIn>();
+                let pay_in_events = events.find::<PalletPaidInEventType::MetadataType>();
 
                 Ok(pay_in_events
                     .enumerate()
                     .map(|(i, event)| {
-                        let event: crate::litentry_rococo::omni_bridge::events::PaidIn = event.unwrap();
+                        let event: PalletPaidInEventType = PalletPaidInEventType::wrap(event.unwrap());
                         BlockEvent::new(
                             EventId::new(block_num, i as u64),
                             PaidInEvent {
-                                amount: event.amount,
-                                resource_id: event.resource_id,
-                                data: event.dest_account,
-                                nonce: event.nonce,
+                                amount: event.amount(),
+                                resource_id: event.resource_id(),
+                                data: event.dest_account(),
+                                nonce: event.nonce(),
                             },
                         )
                     })
@@ -109,8 +113,10 @@ impl<ChainConfig: Config> RpcClientFactory<ChainConfig> {
 }
 
 #[async_trait]
-impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>> for RpcClientFactory<ChainConfig> {
-    async fn new_client(&self) -> Result<RpcClient<ChainConfig>, ()> {
+impl<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent>
+    SubstrateRpcClientFactory<RpcClient<ChainConfig, PalletPaidInEventType>> for RpcClientFactory<ChainConfig>
+{
+    async fn new_client(&self) -> Result<RpcClient<ChainConfig, PalletPaidInEventType>, ()> {
         let rpc_client = subxt::backend::rpc::RpcClient::from_insecure_url(self.url.clone())
             .await
             .map_err(|e| {
@@ -123,6 +129,6 @@ impl<ChainConfig: Config> SubstrateRpcClientFactory<RpcClient<ChainConfig>> for 
         })?;
         let events = online_client.events();
 
-        Ok(RpcClient { legacy, events })
+        Ok(RpcClient { legacy, events, phantom_data: PhantomData })
     }
 }

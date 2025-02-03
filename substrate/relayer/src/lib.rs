@@ -22,7 +22,10 @@ use bridge_core::relay::{RelayError, Relayer};
 use log::*;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
+use subxt::ext::subxt_core::tx::payload::StaticPayload;
+use subxt::tx::Payload;
 use subxt::utils::AccountId32;
 use subxt::{Config, OnlineClient, PolkadotConfig};
 use subxt_signer::bip39::serde;
@@ -30,20 +33,28 @@ use subxt_signer::bip39::serde;
 pub mod key_store;
 
 // Generate an interface that we can use from the node's metadata.
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
-pub mod litentry_rococo {}
+#[subxt::subxt(runtime_metadata_path = "../artifacts/paseo.scale")]
+pub mod paseo {}
+
+#[subxt::subxt(runtime_metadata_path = "../artifacts/heima.scale")]
+pub mod heima {}
+
+#[subxt::subxt(runtime_metadata_path = "../artifacts/local.scale")]
+pub mod local {}
 
 pub type CONF = PolkadotConfig;
 
 #[derive(Deserialize)]
 pub struct RelayerConfig {
     pub ws_rpc_endpoint: String,
+    pub chain: String,
 }
 
 /// Relays bridge request to substrate node's OmniBridge pallet.
-pub struct SubstrateRelayer<T: Config> {
+pub struct SubstrateRelayer<T: Config, PRCF: PayOutRequestCallFactory> {
     rpc_url: String,
     key_store: SubstrateKeyStore,
+    payout_request_call_factory: PRCF,
     _phantom: PhantomData<T>,
 }
 
@@ -61,37 +72,139 @@ pub fn create_from_config<T: Config>(keystore_dir: String, config: &BridgeConfig
         info!("Substrate relayer address: {}", signer.public_key().to_account_id());
 
         let substrate_relayer_config: RelayerConfig = relayer_config.to_specific_config();
-        let relayer: SubstrateRelayer<T> = SubstrateRelayer::new(&substrate_relayer_config.ws_rpc_endpoint, key_store);
-        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+
+        match substrate_relayer_config.chain.as_str() {
+            "local" => {
+                let payout_request_call_factory = LocalPayOutRequestCallFactory {};
+                let relayer: SubstrateRelayer<T, LocalPayOutRequestCallFactory> = SubstrateRelayer::new(
+                    &substrate_relayer_config.ws_rpc_endpoint,
+                    key_store,
+                    payout_request_call_factory,
+                );
+                relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+            },
+            "paseo" => {
+                let payout_request_call_factory = PaseoPayOutRequestCallFactory {};
+                let relayer: SubstrateRelayer<T, PaseoPayOutRequestCallFactory> = SubstrateRelayer::new(
+                    &substrate_relayer_config.ws_rpc_endpoint,
+                    key_store,
+                    payout_request_call_factory,
+                );
+                relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+            },
+            "heima" => {
+                let payout_request_call_factory = HeimaPayOutRequestCallFactory {};
+                let relayer: SubstrateRelayer<T, HeimaPayOutRequestCallFactory> = SubstrateRelayer::new(
+                    &substrate_relayer_config.ws_rpc_endpoint,
+                    key_store,
+                    payout_request_call_factory,
+                );
+                relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+            },
+            _ => panic!("Unknown chain in relayer config"),
+        }
     }
 
     relayers
 }
 
-impl<T: Config> SubstrateRelayer<T> {
-    pub fn new(rpc_url: &str, key_store: SubstrateKeyStore) -> Self {
-        Self { rpc_url: rpc_url.to_string(), key_store, _phantom: PhantomData }
-    }
+pub trait PayOutRequestCallFactory: Send + Sync {
+    type PayOutRequestCallType: Debug + Payload + Send + Sync;
+
+    fn create(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        account: AccountId32,
+    ) -> Self::PayOutRequestCallType;
 }
 
-#[async_trait]
-impl<ChainConfig: Config> Relayer for SubstrateRelayer<ChainConfig> {
-    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], _data: Vec<u8>) -> Result<(), RelayError> {
-        let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
-        let account: AccountId32 = AccountId32::from(account_bytes);
-        debug!("Relaying amount: {} with nonce: {} to account: {:?}", amount, nonce, account);
+pub struct LocalPayOutRequestCallFactory {}
 
-        let request = litentry_rococo::runtime_types::pallet_omni_bridge::PayOutRequest {
+impl PayOutRequestCallFactory for LocalPayOutRequestCallFactory {
+    type PayOutRequestCallType = StaticPayload<local::omni_bridge::calls::types::RequestPayOut>;
+
+    fn create(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        account: AccountId32,
+    ) -> Self::PayOutRequestCallType {
+        let request = local::runtime_types::pallet_omni_bridge::PayOutRequest {
             //todo: should not be hardcoded
-            source_chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0),
+            source_chain: local::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0),
             nonce,
             resource_id,
             dest_account: account,
             amount,
         };
+        local::tx().omni_bridge().request_pay_out(request, true)
+    }
+}
 
-        let call = litentry_rococo::tx().omni_bridge().request_pay_out(request, true);
+pub struct PaseoPayOutRequestCallFactory {}
 
+impl PayOutRequestCallFactory for PaseoPayOutRequestCallFactory {
+    type PayOutRequestCallType = StaticPayload<paseo::omni_bridge::calls::types::RequestPayOut>;
+
+    fn create(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        account: AccountId32,
+    ) -> Self::PayOutRequestCallType {
+        let request = paseo::runtime_types::pallet_omni_bridge::PayOutRequest {
+            //todo: should not be hardcoded
+            source_chain: paseo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0),
+            nonce,
+            resource_id,
+            dest_account: account,
+            amount,
+        };
+        paseo::tx().omni_bridge().request_pay_out(request, true)
+    }
+}
+
+pub struct HeimaPayOutRequestCallFactory {}
+
+impl PayOutRequestCallFactory for HeimaPayOutRequestCallFactory {
+    type PayOutRequestCallType = StaticPayload<heima::omni_bridge::calls::types::RequestPayOut>;
+
+    fn create(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        account: AccountId32,
+    ) -> Self::PayOutRequestCallType {
+        let request = heima::runtime_types::pallet_omni_bridge::PayOutRequest {
+            //todo: should not be hardcoded
+            source_chain: heima::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0),
+            nonce,
+            resource_id,
+            dest_account: account,
+            amount,
+        };
+        heima::tx().omni_bridge().request_pay_out(request, true)
+    }
+}
+
+impl<T: Config, PRCF: PayOutRequestCallFactory> SubstrateRelayer<T, PRCF> {
+    pub fn new(rpc_url: &str, key_store: SubstrateKeyStore, payout_request_call_factory: PRCF) -> Self {
+        Self { rpc_url: rpc_url.to_string(), key_store, payout_request_call_factory, _phantom: PhantomData }
+    }
+}
+
+#[async_trait]
+impl<ChainConfig: Config, PRCF: PayOutRequestCallFactory> Relayer for SubstrateRelayer<ChainConfig, PRCF> {
+    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], _data: Vec<u8>) -> Result<(), RelayError> {
+        let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
+        let account: AccountId32 = AccountId32::from(account_bytes);
+        debug!("Relaying amount: {} with nonce: {} to account: {:?}", amount, nonce, account);
+        let call = self.payout_request_call_factory.create(amount, nonce, resource_id, account);
         log::debug!("Submitting PayOutRequest extrinsic: {:?}", call);
 
         let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)

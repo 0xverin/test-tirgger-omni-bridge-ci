@@ -23,7 +23,7 @@ use subxt::utils::AccountId32;
 use subxt::{OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::dev;
 
-#[subxt::subxt(runtime_metadata_path = "../artifacts/rococo-bridge.scale")]
+#[subxt::subxt(runtime_metadata_path = "../artifacts/local.scale")]
 pub mod litentry_rococo {}
 
 #[derive(Subcommand)]

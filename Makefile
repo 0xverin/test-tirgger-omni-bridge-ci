@@ -83,5 +83,11 @@ build-evm-contracts:
 	cd ethereum/chainbridge-contracts && forge build
 
 .PHONY: get-bridge-pallet-metadata
-get-bridge-pallet-metadata:
-	subxt metadata --url http://localhost:9944 --allow-insecure --pallets OmniBridge,Sudo,System > substrate/artifacts/rococo-bridge.scale
+get-local-bridge-pallet-metadata:
+	subxt metadata --url http://localhost:9944 --allow-insecure --pallets OmniBridge,Sudo,System > substrate/artifacts/local.scale
+
+get-paseo-bridge-pallet-metadata:
+	subxt metadata --url https://rpc.paseo-parachain.litentry.io --pallets OmniBridge,Sudo,System > substrate/artifacts/paseo.scale
+
+get-heima-bridge-pallet-metadata:
+	subxt metadata --url https://litentry-rpc.dwellir.com --pallets OmniBridge,Sudo,System > substrate/artifacts/heima.scale
