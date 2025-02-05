@@ -40,6 +40,16 @@ jobs:
         run: |
           echo -n "${{ secrets.AUTH_KEY_PUB }}" > auth_key_pub.bin
 
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Build chainbridge contracts
+        run: |
+          make build-evm-contracts # we refer to Bridge.json in the code
+
       - name: Build release image
         run: |
           docker build --secret id=signer,src=enclave-key.pem -f Dockerfile.gramine --tag litentry/omni-bridge:${{ env.DOCKER_TAG }} .
