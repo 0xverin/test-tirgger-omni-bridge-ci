@@ -63,6 +63,20 @@ fn alice_signer() -> [u8; 33] {
 async fn main() -> Result<(), ()> {
     let cli = Cli::parse();
 
+    env_logger::builder()
+        .format(|buf, record| {
+            let ts = buf.timestamp_micros();
+            writeln!(
+                buf,
+                "{} [{}][{}]: {}",
+                ts,
+                record.level(),
+                std::thread::current().name().unwrap_or("none"),
+                record.args(),
+            )
+        })
+        .init();
+
     match &cli.command {
         Commands::Run(arg) => run(arg).await?,
         Commands::AwaitKeystoreImport(arg) => await_import(arg).await,
@@ -78,20 +92,6 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
     let keystore_dir = arg.keystore_dir.clone();
 
     let mut handles = vec![];
-
-    env_logger::builder()
-        .format(|buf, record| {
-            let ts = buf.timestamp_micros();
-            writeln!(
-                buf,
-                "{} [{}][{}]: {}",
-                ts,
-                record.level(),
-                std::thread::current().name().unwrap_or("none"),
-                record.args(),
-            )
-        })
-        .init();
 
     let config: String = fs::read_to_string(config_file).unwrap();
     let config: BridgeConfig = serde_json::from_str(&config).unwrap();

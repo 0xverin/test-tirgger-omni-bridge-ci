@@ -183,7 +183,7 @@ pub async fn handle(command: &SubstrateCommand) {
             for _ in 0..10 {
                 if let Some(block_hash) = current_block_hash {
                     let block = api.blocks().at(block_hash).await.unwrap();
-        
+
                     // Fetch all events in the block
                     let events = block.events().await.unwrap();
                     for event in events.iter() {
@@ -199,7 +199,7 @@ pub async fn handle(command: &SubstrateCommand) {
                             }
                         }
                     }
-        
+
                     // Get the parent hash to move to the previous block
                     current_block_hash = Some(block.header().parent_hash);
                 } else {
