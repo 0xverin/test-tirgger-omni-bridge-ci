@@ -57,6 +57,9 @@ pub struct RunArgs {
 
     #[arg(short, long, value_name = "listeners start block")]
     pub start_block: Vec<String>,
+
+    #[arg(short, long, default_value = "9090", value_name = "metrics port")]
+    pub metrics_port: String,
 }
 
 #[derive(Args)]

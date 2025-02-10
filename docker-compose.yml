@@ -8,6 +8,8 @@ services:
       - heima-node
     volumes:
       - ./artifacts/:/artifacts
+    ports:
+      - "9090:9090"
 
   ethereum-node:
     image: ghcr.io/foundry-rs/foundry

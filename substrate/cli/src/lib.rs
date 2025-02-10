@@ -15,6 +15,8 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::litentry_rococo::omni_bridge::Call;
+use crate::litentry_rococo::system::events::ExtrinsicFailed;
+use crate::litentry_rococo::DispatchError;
 use clap::{Args, Subcommand};
 use hex::FromHex;
 use log::info;
@@ -22,8 +24,6 @@ use std::str::FromStr;
 use subxt::utils::AccountId32;
 use subxt::{OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::dev;
-use crate::litentry_rococo::system::events::ExtrinsicFailed;
-use crate::litentry_rococo::DispatchError;
 
 #[subxt::subxt(runtime_metadata_path = "../artifacts/local.scale")]
 pub mod litentry_rococo {}
@@ -188,14 +188,12 @@ pub async fn handle(command: &SubstrateCommand) {
                     let events = block.events().await.unwrap();
                     for event in events.iter() {
                         let details = event.unwrap();
-                        if let Ok(pallet_event) = details.as_event::<ExtrinsicFailed>() {
-                            if let Some(ExtrinsicFailed { dispatch_error, .. }) = pallet_event {
-                                if let DispatchError::Module(error) = dispatch_error {
-                                    if error.index == 85 && error.error[0] == 10 {
-                                        println!("ok");
-                                        break;
-                                    }
-                                }
+                        if let Ok(Some(ExtrinsicFailed { dispatch_error: DispatchError::Module(error), .. })) =
+                            details.as_event::<ExtrinsicFailed>()
+                        {
+                            if error.index == 85 && error.error[0] == 10 {
+                                println!("ok");
+                                break;
                             }
                         }
                     }
@@ -207,6 +205,6 @@ pub async fn handle(command: &SubstrateCommand) {
                     break;
                 }
             }
-        }
+        },
     }
 }

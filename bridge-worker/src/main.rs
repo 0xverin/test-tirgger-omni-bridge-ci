@@ -27,6 +27,7 @@ use ethereum_listener::create_listener;
 use ethereum_listener::listener::ListenerConfig as EthereumListenerConfig;
 use jsonrpsee_types::Id;
 use log::*;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use rand::rngs::OsRng;
 use rand::Rng;
 use rpc::server::start_server;
@@ -37,7 +38,9 @@ use sha2::Sha256;
 use sp_core::{keccak_256, ByteArray, Pair};
 use std::collections::HashMap;
 use std::fs::create_dir;
+use std::net::SocketAddr;
 use std::path::Path;
+use std::str::FromStr;
 use std::thread::JoinHandle;
 use std::{fs, io::Write};
 use std::{
@@ -93,6 +96,14 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
 
     let mut handles = vec![];
 
+    let builder = PrometheusBuilder::new();
+
+    let address = SocketAddr::from_str(&format!("0.0.0.0:{}", arg.metrics_port)).unwrap();
+    builder
+        .with_http_listener(address)
+        .install()
+        .expect("failed to install Prometheus recorder");
+
     let config: String = fs::read_to_string(config_file).unwrap();
     let config: BridgeConfig = serde_json::from_str(&config).unwrap();
 
@@ -105,7 +116,7 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
 
     // ethereum relayers
     let ethereum_relayers: HashMap<String, Box<dyn Relayer>> =
-        ethereum_relayer::create_from_config(keystore_dir, &config);
+        ethereum_relayer::create_from_config(keystore_dir, &config).await;
     relayers.insert("ethereum".to_string(), ethereum_relayers);
 
     let mut start_blocks: HashMap<String, u64> = HashMap::new();

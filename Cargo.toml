@@ -45,7 +45,6 @@ subxt-signer = { version = "0.37.0", features = ["subxt"] }
 sp-core = "34.0.0"
 hex-literal = "0.4"
 tempfile = "3.14.0"
-k256 = { version = "0.13.4", features = ["ecdsa"] }
 jsonrpsee-core = { version = "0.24", features = ["client"] }
 jsonrpsee-types = "0.24"
 jsonrpsee = { version = "0.24", features = ["server"] }
@@ -63,3 +62,5 @@ ethereum-relayer = { path = "ethereum/relayer" }
 substrate-cli = { path = "substrate/cli" }
 substrate-listener = { path = "substrate/listener" }
 substrate-relayer = { path = "substrate/relayer" }
+metrics = "0.24.1"
+metrics-exporter-prometheus = "0.16.2"

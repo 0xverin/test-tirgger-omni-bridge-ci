@@ -216,7 +216,7 @@ async fn query_hei_token_amount(address: Address, hei_token_address: &str, rpc_u
         .call()
         .await
         .unwrap();
-    println!("{}", balance.get(0).unwrap().as_uint().unwrap().0);
+    println!("{}", balance.first().unwrap().as_uint().unwrap().0);
 }
 
 async fn approve_lit_to(

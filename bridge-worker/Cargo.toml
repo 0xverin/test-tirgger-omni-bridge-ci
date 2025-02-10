@@ -26,6 +26,8 @@ ethereum-relayer = { workspace = true }
 substrate-listener = { workspace = true }
 substrate-relayer = { workspace = true }
 
+metrics-exporter-prometheus = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 reqwest = { workspace = true }

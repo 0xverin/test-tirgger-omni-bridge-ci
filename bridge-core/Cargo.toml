@@ -10,6 +10,7 @@ parity-scale-codec = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+metrics = { workspace = true }
 
 [dev-dependencies]
 ethereum-listener = { workspace = true }

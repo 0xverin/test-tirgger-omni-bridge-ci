@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+use metrics::{describe_gauge, gauge};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
@@ -138,6 +139,7 @@ impl<
         last_processed_log_repository: CheckpointRepositoryT,
         start_block: u64,
     ) -> Result<Self, ()> {
+        describe_gauge!(synced_block_gauge_name(id), "Last synced block");
         Ok(Self {
             id: id.to_string(),
             handle,
@@ -272,6 +274,7 @@ impl<
                         self.checkpoint_repository
                             .save(CheckpointT::from(block_number_to_sync))
                             .expect("Could not save checkpoint");
+                        gauge!(synced_block_gauge_name(&self.id)).set(block_number_to_sync as f64);
                         log::info!("Finished syncing block: {}", block_number_to_sync);
                         block_number_to_sync += 1;
                     },
@@ -290,6 +293,10 @@ impl<
             }
         }
     }
+}
+
+fn synced_block_gauge_name(listener_id: &str) -> String {
+    format!("{}_synced_block", listener_id)
 }
 
 #[cfg(test)]
