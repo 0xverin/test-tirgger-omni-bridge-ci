@@ -25,6 +25,8 @@ fs.mounts = [
   { path = "/auth_key_pub.bin", uri = "file:auth_key_pub.bin" },
 ]
 
+sgx.debug = {{ 'true' if env.get('SGX_DEBUG', '0') == '1' else 'false' }}
+
 sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
 
 # dns

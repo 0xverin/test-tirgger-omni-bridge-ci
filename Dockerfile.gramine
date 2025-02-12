@@ -4,6 +4,8 @@
 ##################################################
 FROM gramineproject/gramine:stable-jammy AS build
 
+ARG SGX_DEBUG=0
+
 WORKDIR /usr/src/omni-bridge
 COPY . .
 
@@ -26,7 +28,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN cargo --version
 
 RUN --mount=type=secret,id=signer,target=/usr/src/omni-bridge/enclave-key.pem \
-    make SGX=1
+    make SGX=1 SGX_DEBUG=$SGX_DEBUG
 
 ### Gramine image
 ##################################################
