@@ -44,6 +44,8 @@ pub struct BalanceCmdConf {
     token_address: String,
     #[arg(long, default_value = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8")]
     account: String,
+    #[arg(long, default_value = "8545")]
+    port: u128,
 }
 
 #[derive(Args)]
@@ -65,6 +67,8 @@ pub struct PayInCmdConf {
     bridge_erc20_handler_address: String,
     #[arg(long, default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
     hei_token_address: String,
+    #[arg(long, default_value = "8545")]
+    port: u128,
 }
 
 #[derive(Args)]
@@ -77,6 +81,8 @@ pub struct SetupBridgeCmdConf {
     bridge_erc20_handler_address: String,
     #[arg(long, default_value = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707")]
     hei_token_address: String,
+    #[arg(long, default_value = "8545")]
+    port: u128,
 }
 
 #[derive(Args)]
@@ -87,6 +93,8 @@ pub struct AddRelayerCmdConf {
     bridge_private_key: String,
     #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
     bridge_address: String,
+    #[arg(long, default_value = "8545")]
+    port: u128,
 }
 
 sol!(
@@ -109,10 +117,10 @@ sol!(
 );
 
 pub async fn handle(command: &EthereumCommand) {
-    let rpc_url = "http://localhost:8545";
     // this is the first private key printed out by anvil during startup
     match command {
         EthereumCommand::PayIn(conf) => {
+            let rpc_url = format!("http://localhost:{}", conf.port);
             let erc_20_handler_address = Address::from_slice(&decode(&conf.bridge_erc20_handler_address).unwrap());
             let hei_address = Address::from_slice(&decode(&conf.hei_token_address).unwrap());
 
@@ -121,10 +129,16 @@ pub async fn handle(command: &EthereumCommand) {
             let address = user_signer.address();
 
             // transfer some tokens to user
-            transfer_lit_to(&conf.bridge_private_key, address, &conf.amount, &conf.lit_token_address, rpc_url).await;
+            transfer_lit_to(&conf.bridge_private_key, address, &conf.amount, &conf.lit_token_address, &rpc_url).await;
             // approve lit spending to HEI contract
-            approve_lit_to(conf.user_private_key.as_str(), hei_address, &conf.amount, &conf.lit_token_address, rpc_url)
-                .await;
+            approve_lit_to(
+                conf.user_private_key.as_str(),
+                hei_address,
+                &conf.amount,
+                &conf.lit_token_address,
+                &rpc_url,
+            )
+            .await;
 
             // approve HEI spending to ERC-20 handler contract
             approve_hei_to(
@@ -132,12 +146,12 @@ pub async fn handle(command: &EthereumCommand) {
                 erc_20_handler_address,
                 &conf.amount,
                 &conf.hei_token_address,
-                rpc_url,
+                &rpc_url,
             )
             .await;
 
             // wrap some LIT tokens to HEI tokens
-            wrap_to(conf.user_private_key.as_str(), address, &conf.amount, &conf.hei_token_address, rpc_url).await;
+            wrap_to(conf.user_private_key.as_str(), address, &conf.amount, &conf.hei_token_address, &rpc_url).await;
 
             // deposit on bridge instance
             bridge_deposit(
@@ -145,32 +159,35 @@ pub async fn handle(command: &EthereumCommand) {
                 &conf.amount,
                 conf.dest_address.to_owned(),
                 &conf.bridge_address,
-                rpc_url,
+                &rpc_url,
             )
             .await;
         },
         EthereumCommand::AddRelayer(conf) => {
+            let rpc_url = format!("http://localhost:{}", conf.port);
             add_relayer(
                 &conf.bridge_private_key,
                 &conf.bridge_address,
                 Address::from_slice(&decode(&conf.relayer_address).unwrap()),
-                rpc_url,
+                &rpc_url,
             )
             .await;
         },
         EthereumCommand::SetupBridge(conf) => {
+            let rpc_url = format!("http://localhost:{}", conf.port);
             setup_bridge(
                 &conf.bridge_private_key,
                 &conf.bridge_address,
                 &conf.bridge_erc20_handler_address,
                 &conf.hei_token_address,
-                rpc_url,
+                &rpc_url,
             )
             .await;
         },
         EthereumCommand::Balance(conf) => {
+            let rpc_url = format!("http://localhost:{}", conf.port);
             let address = Address::from_str(&conf.account).unwrap();
-            query_hei_token_amount(address, &conf.token_address, rpc_url).await;
+            query_hei_token_amount(address, &conf.token_address, &rpc_url).await;
         },
     }
 }

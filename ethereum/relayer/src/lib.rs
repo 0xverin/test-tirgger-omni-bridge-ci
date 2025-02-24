@@ -36,6 +36,7 @@ use metrics::{describe_gauge, gauge};
 use mockall::automock;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub mod key_store;
 
@@ -139,8 +140,11 @@ pub struct RelayerConfig {
     pub bridge_contract_address: String,
 }
 
-pub async fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> HashMap<String, Box<dyn Relayer>> {
-    let mut relayers: HashMap<String, Box<dyn Relayer>> = HashMap::new();
+pub async fn create_from_config(
+    keystore_dir: String,
+    config: &BridgeConfig,
+) -> HashMap<String, Arc<Box<dyn Relayer<String>>>> {
+    let mut relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>> = HashMap::new();
     for relayer_config in config.relayers.iter().filter(|r| r.relayer_type == "ethereum") {
         let key_store = EthereumKeyStore::new(format!("{}/{}.bin", keystore_dir, relayer_config.id));
 
@@ -159,11 +163,14 @@ pub async fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> 
 
         let bridge_contract_wrapper = BridgeContractWrapper { instance: bridge_instance };
 
-        let relayer: EthereumRelayer<BridgeContractWrapper> =
-            EthereumRelayer::new(relayer_address.to_string(), bridge_contract_wrapper)
-                .await
-                .unwrap();
-        relayers.insert(relayer_config.id.to_string(), Box::new(relayer));
+        let relayer: EthereumRelayer<BridgeContractWrapper> = EthereumRelayer::new(
+            relayer_address.to_string(),
+            bridge_contract_wrapper,
+            relayer_config.destination_id.clone(),
+        )
+        .await
+        .unwrap();
+        relayers.insert(relayer_config.id.to_string(), Arc::new(Box::new(relayer)));
     }
     relayers
 }
@@ -173,26 +180,33 @@ pub async fn create_from_config(keystore_dir: String, config: &BridgeConfig) -> 
 pub struct EthereumRelayer<T: BridgeInterface + RelayerBalance> {
     address: String,
     bridge_instance: T,
+    destination_id: String,
 }
 
 // TODO: We need to configure gas options
 #[allow(clippy::result_unit_err)]
 impl<T: BridgeInterface + RelayerBalance> EthereumRelayer<T> {
-    pub async fn new(address: String, bridge_instance: T) -> Result<Self, ()> {
+    pub async fn new(address: String, bridge_instance: T, destination_id: String) -> Result<Self, ()> {
         describe_gauge!(balance_gauge_name(&address), "Ethereum relayer balance");
 
         // initalize relayer's balance metric
         if let Ok(balance) = bridge_instance.get_balance().await {
-            error!("Got balance {}", balance);
             gauge!(balance_gauge_name(&address)).set(balance as f64);
         }
-        Ok(Self { address, bridge_instance })
+        Ok(Self { address, bridge_instance, destination_id })
     }
 }
 
 #[async_trait]
-impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer for EthereumRelayer<T> {
-    async fn relay(&self, amount: u128, nonce: u64, resource_id: [u8; 32], data: Vec<u8>) -> Result<(), RelayError> {
+impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer<String> for EthereumRelayer<T> {
+    async fn relay(
+        &self,
+        amount: u128,
+        nonce: u64,
+        resource_id: [u8; 32],
+        data: Vec<u8>,
+        _chain_id: u32,
+    ) -> Result<(), RelayError> {
         debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
 
         // resource id 0
@@ -232,6 +246,10 @@ impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer for EthereumRela
         debug!("Proposal relayed");
         Ok(())
     }
+
+    fn destination_id(&self) -> String {
+        self.destination_id.clone()
+    }
 }
 
 pub fn prepare_bridge_instance(
@@ -261,10 +279,7 @@ fn balance_gauge_name(address: &str) -> String {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
-        prepare_bridge_instance, BridgeContractWrapper, BridgeInterface, EthereumRelayer, MockBridgeInterface,
-        RelayerBalance,
-    };
+    use crate::{prepare_bridge_instance, BridgeContractWrapper, BridgeInterface, EthereumRelayer, RelayerBalance};
     use alloy::primitives::{Bytes, FixedBytes};
     use alloy::signers::local::PrivateKeySigner;
     use async_trait::async_trait;
@@ -296,9 +311,11 @@ pub mod tests {
         let mut bridge_instance = MockBridgeInstance::new();
         bridge_instance.expect_vote_proposal().returning(|_, _, _, _| Ok(()));
 
-        let relayer = EthereumRelayer::new("0x".to_string(), bridge_instance).await.unwrap();
+        let relayer = EthereumRelayer::new("0x".to_string(), bridge_instance, "0100000000".to_string())
+            .await
+            .unwrap();
 
-        let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec()).await;
+        let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec(), 0).await;
         assert!(matches!(result, Err(RelayError::Other)));
     }
 

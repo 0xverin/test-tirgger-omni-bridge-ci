@@ -17,6 +17,8 @@
 use metrics::{describe_gauge, gauge};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::{hash::Hash, marker::PhantomData, thread::sleep, time::Duration};
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
@@ -30,25 +32,25 @@ use crate::{
 
 /// Represents `PayIn` event emitted on one side of the bridge.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PayIn<Id: Clone, EventSourceId: Clone> {
+pub struct PayIn<Id: Clone, DestinationId: Clone> {
     id: Id,
-    maybe_event_source: Option<EventSourceId>,
+    maybe_destination_id: Option<DestinationId>,
     amount: u128,
     nonce: u64,
     resource_id: [u8; 32],
     data: Vec<u8>,
 }
 
-impl<Id: Clone, EventSourceId: Clone> PayIn<Id, EventSourceId> {
+impl<Id: Clone, DestinationId: Clone> PayIn<Id, DestinationId> {
     pub fn new(
         id: Id,
-        maybe_event_source: Option<EventSourceId>,
+        maybe_destination_id: Option<DestinationId>,
         amount: u128,
         nonce: u64,
         resource_id: [u8; 32],
         data: Vec<u8>,
     ) -> Self {
-        Self { id, maybe_event_source, amount, nonce, resource_id, data }
+        Self { id, maybe_destination_id, amount, nonce, resource_id, data }
     }
 }
 
@@ -71,24 +73,25 @@ pub struct ListenerContext<T> {
     pub id: String,
     pub config: T,
     pub start_block: u64,
-    pub relayers: Vec<Box<dyn crate::relay::Relayer>>,
+    pub chain_id: u32,
+    pub relayers: HashMap<String, Arc<Box<dyn crate::relay::Relayer<String>>>>,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn prepare_listener_context<T: DeserializeOwned>(
     config: &BridgeConfig,
     listener_type: &str,
-    relayers: &mut HashMap<String, HashMap<String, Box<dyn crate::relay::Relayer>>>,
+    relayers: &HashMap<String, HashMap<String, Arc<Box<dyn crate::relay::Relayer<String>>>>>,
     start_blocks: &HashMap<String, u64>,
 ) -> Vec<ListenerContext<T>> {
     let mut components = vec![];
     for listener_config in config.listeners.iter().filter(|l| l.listener_type == listener_type) {
         let ethereum_listener_config: T = listener_config.to_specific_config();
-        let mut listener_relayers: Vec<Box<dyn crate::relay::Relayer>> = vec![];
-
+        let mut listener_relayers: HashMap<String, Arc<Box<dyn crate::relay::Relayer<String>>>> = HashMap::new();
         for relayer_id in listener_config.relayers.iter() {
-            for relayers in relayers.values_mut() {
-                if let Some(relayer) = relayers.remove(relayer_id) {
-                    listener_relayers.push(relayer)
+            for relayers in relayers.values() {
+                if let Some(relayer) = relayers.get(relayer_id) {
+                    listener_relayers.insert(relayer.destination_id(), relayer.clone());
                 }
             }
         }
@@ -99,6 +102,7 @@ pub fn prepare_listener_context<T: DeserializeOwned>(
             id: listener_config.id.clone(),
             config: ethereum_listener_config,
             start_block,
+            chain_id: listener_config.chain_id,
             relayers: listener_relayers,
         });
     }
@@ -110,34 +114,36 @@ pub fn prepare_listener_context<T: DeserializeOwned>(
 /// `Fetcher` - used to fetch data from source chain
 /// `Relayer` - used to relay bridge requests to destination chain
 /// `CheckpointRepository` - used to store listener's progress
-pub struct Listener<EventSourceId, Fetcher, Checkpoint, CheckpointRepository, PayInEventId> {
+pub struct Listener<DestinationId, Fetcher, Checkpoint, CheckpointRepository, PayInEventId> {
     id: String,
     handle: Handle,
     fetcher: Fetcher,
-    relay: Relay<EventSourceId>,
+    relay: Relay<DestinationId>,
     stop_signal: Receiver<()>,
     checkpoint_repository: CheckpointRepository,
     start_block: u64,
+    chain_id: u32,
     _phantom: PhantomData<(Checkpoint, PayInEventId)>,
 }
 
-#[allow(clippy::result_unit_err)]
+#[allow(clippy::result_unit_err, clippy::too_many_arguments)]
 impl<
-        EventSourceId: Hash + Eq + Clone,
+        DestinationId: Hash + Eq + Clone + Debug + Send + Sync,
         PayInEventId: Into<CheckpointT> + Clone,
-        Fetcher: LastFinalizedBlockNumFetcher + BlockPayInEventsFetcher<PayInEventId, EventSourceId>,
+        Fetcher: LastFinalizedBlockNumFetcher + BlockPayInEventsFetcher<PayInEventId, DestinationId>,
         CheckpointT: PartialOrd + Checkpoint + From<u64>,
         CheckpointRepositoryT: CheckpointRepository<CheckpointT>,
-    > Listener<EventSourceId, Fetcher, CheckpointT, CheckpointRepositoryT, PayInEventId>
+    > Listener<DestinationId, Fetcher, CheckpointT, CheckpointRepositoryT, PayInEventId>
 {
     pub fn new(
         id: &str,
         handle: Handle,
         fetcher: Fetcher,
-        relay: Relay<EventSourceId>,
+        relay: Relay<DestinationId>,
         stop_signal: Receiver<()>,
         last_processed_log_repository: CheckpointRepositoryT,
         start_block: u64,
+        chain_id: u32,
     ) -> Result<Self, ()> {
         describe_gauge!(synced_block_gauge_name(id), "Last synced block");
         Ok(Self {
@@ -148,6 +154,7 @@ impl<
             stop_signal,
             checkpoint_repository: last_processed_log_repository,
             start_block,
+            chain_id,
             _phantom: PhantomData,
         })
     }
@@ -214,8 +221,8 @@ impl<
                             let maybe_relayer = match self.relay {
                                 Relay::Single(ref relay) => Some(relay),
                                 Relay::Multi(ref relayers) => {
-                                    if let Some(event_source_id) = event.maybe_event_source {
-                                        relayers.get(&event_source_id)
+                                    if let Some(destination_id) = event.maybe_destination_id {
+                                        relayers.get(&destination_id)
                                     } else {
                                         None
                                     }
@@ -233,6 +240,7 @@ impl<
                                             event.nonce,
                                             event.resource_id,
                                             event.data,
+                                            self.chain_id,
                                         )) {
                                             Err(RelayError::TransportError) => {
                                                 log::info!("Could not relay due to TransportError, will try again...");
@@ -240,7 +248,8 @@ impl<
                                                 continue 'main;
                                             },
                                             Err(RelayError::Other) => {
-                                                panic!("Unexpected error occurred during relaying");
+                                                log::error!("Unexpected error occurred during relaying");
+                                                return Err(());
                                             },
                                             _ => {},
                                         }
@@ -253,6 +262,7 @@ impl<
                                         event.nonce,
                                         event.resource_id,
                                         event.data,
+                                        self.chain_id,
                                     )) {
                                         Err(RelayError::TransportError) => {
                                             log::info!("Could not relay due to TransportError, will try again...");
@@ -260,6 +270,7 @@ impl<
                                             continue 'main;
                                         },
                                         Err(RelayError::Other) => {
+                                            log::error!("Unexpected error occurred during relaying");
                                             return Err(());
                                         },
                                         _ => {},
@@ -309,6 +320,7 @@ pub mod tests {
     use mockall::predicate::eq;
     use mockall::*;
     use std::cmp::Ordering;
+    use std::sync::Arc;
     use std::thread;
     use tokio::runtime::Handle;
 
@@ -319,8 +331,8 @@ pub mod tests {
             async fn get_last_finalized_block_num(&mut self) -> Result<Option<u64>, ()>;
         }
         #[async_trait]
-        impl BlockPayInEventsFetcher<u64, ()> for Fetcher {
-            async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<u64, ()>>, ()>;
+        impl BlockPayInEventsFetcher<u64, String> for Fetcher {
+            async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<u64, String>>, ()>;
         }
     }
 
@@ -370,8 +382,8 @@ pub mod tests {
         relayer
             .expect_relay()
             .times(2)
-            .returning(|_, _, _, _| Box::pin(futures::future::ready(Ok(()))));
-        let relay = Relay::Single(Box::new(relayer));
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Ok(()))));
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
         let mut fetcher = MockFetcher::new();
         fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
         fetcher
@@ -400,7 +412,7 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(Some(SimpleCheckpoint { block_num: 1 }));
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -424,8 +436,8 @@ pub mod tests {
         relayer
             .expect_relay()
             .times(1)
-            .returning(|_, _, _, _| Box::pin(futures::future::ready(Err(RelayError::Other))));
-        let relay = Relay::Single(Box::new(relayer));
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::Other))));
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
 
         let mut fetcher = MockFetcher::new();
         fetcher.expect_get_last_finalized_block_num().times(1).returning(|| Ok(Some(3)));
@@ -440,7 +452,7 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(None);
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -461,8 +473,8 @@ pub mod tests {
         relayer
             .expect_relay()
             .times(3)
-            .returning(|_, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
-        let relay = Relay::Single(Box::new(relayer));
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
 
         let mut fetcher = MockFetcher::new();
         fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
@@ -477,7 +489,7 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(None);
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0).unwrap();
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();

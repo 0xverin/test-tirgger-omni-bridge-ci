@@ -67,9 +67,9 @@ impl<
 impl<
         RpcClient: SubstrateRpcClient + Sync + Send,
         RpcClientFactory: SubstrateRpcClientFactory<RpcClient> + Sync + Send,
-    > BlockPayInEventsFetcher<PayInEventId, ()> for Fetcher<RpcClient, RpcClientFactory>
+    > BlockPayInEventsFetcher<PayInEventId, String> for Fetcher<RpcClient, RpcClientFactory>
 {
-    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, ()>>, ()> {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, String>>, ()> {
         self.connect_if_needed().await;
 
         if let Some(ref mut client) = self.client {
@@ -79,7 +79,7 @@ impl<
                     .map(|event| {
                         PayIn::new(
                             event.id,
-                            None,
+                            Some(hex::encode(event.event.dest_chain)),
                             event.event.amount,
                             event.event.nonce,
                             event.event.resource_id,

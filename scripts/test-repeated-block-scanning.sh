@@ -14,13 +14,13 @@ $CLI --version
 
 echo "Force recreating the omni-bridge container..." 
 docker compose up -d --force-recreate --no-deps omni-bridge 
-echo "sleeping for 20s.."
-sleep 20 
+echo "sleeping for 60s.."
+sleep 60
 
 echo "look for failed extrinsics in heima.." 
 r=$($CLI substrate failed-bridge-tx)
-if [ $r = "ok" ]; then
-  echo "Extrinsic failed in substrate; ok"
+if [ $r = "2" ]; then
+  echo "2 extrinsic failed in substrate; ok"
 else
   echo "nok: $r"
   exit 1
@@ -39,7 +39,7 @@ fi
 echo "check if balance remains unchanged on Heima.."
 r=$($CLI substrate balance --account 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty)
 # Bob should have 1100 LIT now: 1000 from genesis + 100 bridged
-if [ $r = "1100000000000000000000" ]; then
+if [ $r = "1200000000000000000000" ]; then
   echo "balance ok"
   exit 0
 else

@@ -17,7 +17,7 @@
 // sepolia address
 // 0xb77cbea4b8f4d176b6999d0c22a9ce8e1303483d
 
-use crate::listener::{EventSourceId, PayInEventId};
+use crate::listener::{DestinationId, PayInEventId};
 use crate::rpc_client::EthereumRpcClient;
 use alloy::primitives::{keccak256, Address, B256, U256};
 use alloy::sol;
@@ -25,6 +25,7 @@ use alloy::sol_types::{SolEvent, SolValue};
 use async_trait::async_trait;
 use bridge_core::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
 use bridge_core::listener::PayIn;
+use parity_scale_codec::Encode;
 use std::collections::HashSet;
 
 pub static EVENT_TOPIC: &str = "Deposit(uint8,bytes32,uint64,address,bytes,bytes)";
@@ -66,8 +67,8 @@ impl<C: EthereumRpcClient + Sync + Send> LastFinalizedBlockNumFetcher for Fetche
 }
 
 #[async_trait]
-impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, EventSourceId> for Fetcher<C> {
-    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, EventSourceId>>, ()> {
+impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, DestinationId> for Fetcher<C> {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<PayInEventId, DestinationId>>, ()> {
         let block_logs = self
             .client
             .get_block_logs(block_num, Vec::from_iter(self.event_sources.clone()), EVENT_TOPIC)
@@ -85,6 +86,7 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
             .map(|log| {
                 let event = ChainBridge::Deposit::abi_decode_data(&log.data, false).unwrap();
                 log::debug!("Got contract events: {:?}", event);
+                let destination_id = event.0;
                 let resource_id = event.1;
                 let nonce = event.2;
                 let data = event.3;
@@ -92,7 +94,14 @@ impl<C: EthereumRpcClient + Sync + Send> BlockPayInEventsFetcher<PayInEventId, E
                 let amount_bytes = &data[0..32];
                 let amount: U256 = U256::abi_decode(amount_bytes, false).unwrap();
 
-                PayIn::new(log.id, Some(log.address), amount.try_into().unwrap(), nonce, resource_id.0, data.into())
+                PayIn::new(
+                    log.id,
+                    Some(hex::encode(destination_id.encode())),
+                    amount.try_into().unwrap(),
+                    nonce,
+                    resource_id.0,
+                    data.into(),
+                )
             })
             .collect();
 
@@ -143,7 +152,7 @@ mod test {
         let block_2_logs: Vec<Log> = vec![];
 
         let block_1_pay_in_events: Vec<EthereumPayInEvent> =
-            vec![PayIn::new(PayInEventId::new(1, 1, 1), Some(source), 10, 1, [0; 32], event_data)];
+            vec![PayIn::new(PayInEventId::new(1, 1, 1), None, 10, 1, [0; 32], event_data)];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
 
         pay_in_events.insert(1, block_1_pay_in_events.clone());

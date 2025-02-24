@@ -24,7 +24,7 @@ use crate::primitives::SyncCheckpoint;
 pub type PayInEventId = EventId;
 
 pub type SubstrateListener<RpcClient, RpcClientFactory, CheckpointRepository> =
-    Listener<(), Fetcher<RpcClient, RpcClientFactory>, SyncCheckpoint, CheckpointRepository, PayInEventId>;
+    Listener<String, Fetcher<RpcClient, RpcClientFactory>, SyncCheckpoint, CheckpointRepository, PayInEventId>;
 
 #[derive(Deserialize)]
 pub struct ListenerConfig {

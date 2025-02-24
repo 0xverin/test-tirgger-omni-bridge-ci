@@ -25,7 +25,10 @@ use crate::rpc_client::{RpcClient, RpcClientFactory};
 use bridge_core::listener::Listener;
 use bridge_core::relay::{Relay, Relayer};
 use bridge_core::sync_checkpoint_repository::FileCheckpointRepository;
+use parity_scale_codec::Encode;
 use scale_encode::EncodeAsType;
+use std::collections::HashMap;
+use std::sync::Arc;
 use subxt::config::signed_extensions;
 use subxt::events::StaticEvent;
 use subxt::Config;
@@ -78,7 +81,8 @@ pub async fn create_local_listener<ChainConfig: Config>(
     handle: Handle,
     config: &ListenerConfig,
     start_block: u64,
-    relayer: Box<dyn Relayer>,
+    chain_id: u32,
+    relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>>,
     stop_signal: Receiver<()>,
 ) -> Result<
     SubstrateListener<
@@ -93,7 +97,16 @@ pub async fn create_local_listener<ChainConfig: Config>(
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
-    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+    Listener::new(
+        id,
+        handle,
+        fetcher,
+        Relay::Multi(relayers),
+        stop_signal,
+        last_processed_log_repository,
+        start_block,
+        chain_id,
+    )
 }
 
 /// Creates Paseo chain listener.
@@ -102,7 +115,8 @@ pub async fn create_paseo_listener<ChainConfig: Config>(
     handle: Handle,
     config: &ListenerConfig,
     start_block: u64,
-    relayer: Box<dyn Relayer>,
+    chain_id: u32,
+    relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>>,
     stop_signal: Receiver<()>,
 ) -> Result<
     SubstrateListener<
@@ -117,7 +131,16 @@ pub async fn create_paseo_listener<ChainConfig: Config>(
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
-    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+    Listener::new(
+        id,
+        handle,
+        fetcher,
+        Relay::Multi(relayers),
+        stop_signal,
+        last_processed_log_repository,
+        start_block,
+        chain_id,
+    )
 }
 
 /// Creates Heima chain listener.
@@ -126,7 +149,8 @@ pub async fn create_heima_listener<ChainConfig: Config>(
     handle: Handle,
     config: &ListenerConfig,
     start_block: u64,
-    relayer: Box<dyn Relayer>,
+    chain_id: u32,
+    relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>>,
     stop_signal: Receiver<()>,
 ) -> Result<
     SubstrateListener<
@@ -141,7 +165,16 @@ pub async fn create_heima_listener<ChainConfig: Config>(
     let fetcher = Fetcher::new(client_factory);
     let last_processed_log_repository = FileCheckpointRepository::new(&format!("data/{}_last_log.bin", id));
 
-    Listener::new(id, handle, fetcher, Relay::Single(relayer), stop_signal, last_processed_log_repository, start_block)
+    Listener::new(
+        id,
+        handle,
+        fetcher,
+        Relay::Multi(relayers),
+        stop_signal,
+        last_processed_log_repository,
+        start_block,
+        chain_id,
+    )
 }
 
 pub trait PalletPaidInEvent: Send {
@@ -153,6 +186,8 @@ pub trait PalletPaidInEvent: Send {
     fn resource_id(&self) -> [u8; 32];
     fn dest_account(&self) -> Vec<u8>;
     fn nonce(&self) -> u64;
+
+    fn dest_chain(&self) -> Vec<u8>;
 }
 
 pub struct HeimaPaidInEvent {
@@ -180,6 +215,10 @@ impl PalletPaidInEvent for HeimaPaidInEvent {
 
     fn nonce(&self) -> u64 {
         self.raw.nonce
+    }
+
+    fn dest_chain(&self) -> Vec<u8> {
+        self.raw.dest_chain.encode()
     }
 }
 
@@ -209,6 +248,10 @@ impl PalletPaidInEvent for LocalPaidInEvent {
     fn nonce(&self) -> u64 {
         self.raw.nonce
     }
+
+    fn dest_chain(&self) -> Vec<u8> {
+        self.raw.dest_chain.encode()
+    }
 }
 
 pub struct PaseoPaidInEvent {
@@ -236,5 +279,9 @@ impl PalletPaidInEvent for PaseoPaidInEvent {
 
     fn nonce(&self) -> u64 {
         self.raw.nonce
+    }
+
+    fn dest_chain(&self) -> Vec<u8> {
+        self.raw.dest_chain.encode()
     }
 }

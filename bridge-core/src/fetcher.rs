@@ -28,6 +28,6 @@ pub trait LastFinalizedBlockNumFetcher {
 /// This means that if there are two or more smart contracts deployed on the same chain, it should be possible to
 /// fetch events from all of them together.
 #[async_trait]
-pub trait BlockPayInEventsFetcher<Id: Clone, EventSourceId: Clone> {
-    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<Id, EventSourceId>>, ()>;
+pub trait BlockPayInEventsFetcher<Id: Clone, DestinationId: Clone> {
+    async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<PayIn<Id, DestinationId>>, ()>;
 }

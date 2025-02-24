@@ -23,8 +23,9 @@ use bridge_core::{listener::Listener, relay::Relayer};
 use listener::EthereumListener;
 use log::error;
 use rpc_client::EthersRpcClient;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use std::sync::Arc;
 use tokio::{runtime::Handle, sync::oneshot::Receiver};
 
 mod fetcher;
@@ -41,7 +42,8 @@ pub fn create_listener(
     handle: Handle,
     config: &ListenerConfig,
     start_block: u64,
-    relays: Box<dyn Relayer>,
+    chain_id: u32,
+    relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>>,
     stop_signal: Receiver<()>,
 ) -> Result<EthereumListener<EthersRpcClient, FileCheckpointRepository>, ()> {
     let client = EthersRpcClient::new(&config.node_rpc_url).map_err(|e| {
@@ -60,10 +62,11 @@ pub fn create_listener(
         id,
         handle,
         fetcher,
-        relay::Relay::Single(relays),
+        relay::Relay::Multi(relayers),
         stop_signal,
         last_processed_log_repository,
         start_block,
+        chain_id,
     )
     .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
 

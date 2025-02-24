@@ -12,6 +12,7 @@ scale-encode = { workspace = true }
 serde = { workspace = true }
 subxt = { workspace = true }
 tokio = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

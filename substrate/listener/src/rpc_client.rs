@@ -40,6 +40,8 @@ pub struct PaidInEvent {
     pub nonce: u64,
     pub resource_id: [u8; 32],
     pub data: Vec<u8>,
+    // scale encoded chain type from omni-bridge pallet
+    pub dest_chain: Vec<u8>,
 }
 
 /// For fetching data from Substrate RPC node
@@ -86,6 +88,7 @@ impl<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent> SubstrateRpc
                                 resource_id: event.resource_id(),
                                 data: event.dest_account(),
                                 nonce: event.nonce(),
+                                dest_chain: event.dest_chain(),
                             },
                         )
                     })

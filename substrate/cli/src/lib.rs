@@ -48,6 +48,8 @@ pub struct PayInConf {
     dest_address: String,
     #[arg(long, default_value = "100000000000000000000")] // 100 LIT
     amount: u128,
+    #[arg(long, default_value = "0")] // ethereum main network
+    ethereum_id: u32,
 }
 
 #[derive(Args)]
@@ -119,7 +121,35 @@ pub async fn handle(command: &SubstrateCommand) {
             hash.wait_for_finalized().await.unwrap();
 
             let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
+            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(56);
+
+            info!("Adding pay in pair on OmniBridgePallet");
+            let add_pay_in_pair_call = litentry_rococo::tx().omni_bridge().add_pay_in_pair(asset_kind, dest_chain);
+
+            let hash = api
+                .tx()
+                .sign_and_submit_then_watch(&add_pay_in_pair_call, &alice_signer, Default::default())
+                .await
+                .unwrap();
+
+            hash.wait_for_finalized().await.unwrap();
+
+            let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
             let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0);
+
+            // set pay in fee
+            info!("Setting pay in fee on OmniBridgePallet");
+            let set_pay_in_fee = litentry_rococo::tx().omni_bridge().set_pay_in_fee(asset_kind, dest_chain, 0);
+            let hash = api
+                .tx()
+                .sign_and_submit_then_watch(&set_pay_in_fee, &alice_signer, Default::default())
+                .await
+                .unwrap();
+
+            hash.wait_for_finalized().await.unwrap();
+
+            let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
+            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(56);
 
             // set pay in fee
             info!("Setting pay in fee on OmniBridgePallet");
@@ -159,7 +189,7 @@ pub async fn handle(command: &SubstrateCommand) {
 
             let request = litentry_rococo::runtime_types::pallet_omni_bridge::PayInRequest {
                 asset: litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native,
-                dest_chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0),
+                dest_chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(conf.ethereum_id),
                 dest_account: recipient_address,
                 amount: conf.amount,
             };
@@ -179,8 +209,10 @@ pub async fn handle(command: &SubstrateCommand) {
             let latest_block = api.blocks().at_latest().await.unwrap();
             let mut current_block_hash = Some(latest_block.hash());
 
-            // Scan the last 10 blocks for failed tx extrinsic events
-            for _ in 0..10 {
+            let mut count = 0;
+
+            // Scan the last 20 blocks for failed tx extrinsic events
+            for _ in 0..20 {
                 if let Some(block_hash) = current_block_hash {
                     let block = api.blocks().at(block_hash).await.unwrap();
 
@@ -192,19 +224,16 @@ pub async fn handle(command: &SubstrateCommand) {
                             details.as_event::<ExtrinsicFailed>()
                         {
                             if error.index == 85 && error.error[0] == 10 {
-                                println!("ok");
-                                break;
+                                count += 1;
                             }
                         }
                     }
 
                     // Get the parent hash to move to the previous block
                     current_block_hash = Some(block.header().parent_hash);
-                } else {
-                    println!("Failed to find failed tx");
-                    break;
                 }
             }
+            println!("{}", count);
         },
     }
 }

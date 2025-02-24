@@ -71,10 +71,11 @@ async fn main() -> Result<(), ()> {
             let ts = buf.timestamp_micros();
             writeln!(
                 buf,
-                "{} [{}][{}]: {}",
+                "{} [{}][{}][{}]: {}",
                 ts,
                 record.level(),
                 std::thread::current().name().unwrap_or("none"),
+                record.target(),
                 record.args(),
             )
         })
@@ -107,15 +108,16 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
     let config: String = fs::read_to_string(config_file).unwrap();
     let config: BridgeConfig = serde_json::from_str(&config).unwrap();
 
-    let mut relayers: HashMap<String, HashMap<String, Box<dyn Relayer>>> = HashMap::new();
+    #[allow(clippy::type_complexity)]
+    let mut relayers: HashMap<String, HashMap<String, Arc<Box<dyn Relayer<String>>>>> = HashMap::new();
 
     // substrate relayers
-    let substrate_relayers: HashMap<String, Box<dyn Relayer>> =
-        substrate_relayer::create_from_config::<CustomConfig>(keystore_dir.clone(), &config);
+    let substrate_relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>> =
+        substrate_relayer::create_from_config::<CustomConfig>(keystore_dir.clone(), &config.relayers);
     relayers.insert("substrate".to_string(), substrate_relayers);
 
     // ethereum relayers
-    let ethereum_relayers: HashMap<String, Box<dyn Relayer>> =
+    let ethereum_relayers: HashMap<String, Arc<Box<dyn Relayer<String>>>> =
         ethereum_relayer::create_from_config(keystore_dir, &config).await;
     relayers.insert("ethereum".to_string(), ethereum_relayers);
 
@@ -133,14 +135,14 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
 
     // start ethereum listeners
     let ethereum_listener_contexts: Vec<ListenerContext<EthereumListenerConfig>> =
-        prepare_listener_context(&config, "ethereum", &mut relayers, &start_blocks);
+        prepare_listener_context(&config, "ethereum", &relayers, &start_blocks);
     for ethereum_listener_context in ethereum_listener_contexts {
         handles.push(sync_ethereum(ethereum_listener_context).unwrap());
     }
 
     // start substrate listeners
     let substrate_listener_contexts: Vec<ListenerContext<SubstrateListenerConfig>> =
-        prepare_listener_context(&config, "substrate", &mut relayers, &start_blocks);
+        prepare_listener_context(&config, "substrate", &relayers, &start_blocks);
     for substrate_listener_context in substrate_listener_contexts {
         // todo: remove unwrap ??
         handles.push(sync_substrate(substrate_listener_context).await.unwrap())
@@ -197,13 +199,8 @@ fn build_import(arg: &ImportArgs) {
     build_import_internal(arg.ethereum_id.clone(), arg.ethereum_relayer_key_path.clone(), &shielding_key, &auth_key);
 }
 
-async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -> Result<JoinHandle<()>, ()> {
+async fn sync_substrate(context: ListenerContext<SubstrateListenerConfig>) -> Result<JoinHandle<()>, ()> {
     let (_sub_stop_sender, sub_stop_receiver) = oneshot::channel();
-
-    //todo: for now we assume there is only one relayer =]
-    assert_eq!(context.relayers.len(), 1);
-
-    let relayer: Box<dyn Relayer> = context.relayers.remove(0);
 
     match context.config.chain.as_str() {
         "local" => {
@@ -212,7 +209,8 @@ async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -
                 Handle::current(),
                 &context.config,
                 context.start_block,
-                relayer,
+                context.chain_id,
+                context.relayers,
                 sub_stop_receiver,
             )
             .await?;
@@ -227,7 +225,8 @@ async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -
                 Handle::current(),
                 &context.config,
                 context.start_block,
-                relayer,
+                context.chain_id,
+                context.relayers,
                 sub_stop_receiver,
             )
             .await?;
@@ -242,7 +241,8 @@ async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -
                 Handle::current(),
                 &context.config,
                 context.start_block,
-                relayer,
+                context.chain_id,
+                context.relayers,
                 sub_stop_receiver,
             )
             .await?;
@@ -255,18 +255,23 @@ async fn sync_substrate(mut context: ListenerContext<SubstrateListenerConfig>) -
     }
 }
 
-fn sync_ethereum(mut context: ListenerContext<EthereumListenerConfig>) -> Result<JoinHandle<()>, ()> {
-    assert_eq!(context.relayers.len(), 1);
-
-    let relayer: Box<dyn Relayer> = context.relayers.remove(0);
-
+fn sync_ethereum(context: ListenerContext<EthereumListenerConfig>) -> Result<JoinHandle<()>, ()> {
     let (_stop_sender, stop_receiver) = oneshot::channel();
-    let mut eth_listener =
-        create_listener(&context.id, Handle::current(), &context.config, context.start_block, relayer, stop_receiver)?;
+    let mut eth_listener = create_listener(
+        &context.id,
+        Handle::current(),
+        &context.config,
+        context.start_block,
+        context.chain_id,
+        context.relayers,
+        stop_receiver,
+    )?;
 
     Ok(thread::Builder::new()
         .name(format!("{}_sync", &context.id).to_string())
-        .spawn(move || eth_listener.sync().unwrap())
+        .spawn(move || {
+            let _ = eth_listener.sync();
+        })
         .unwrap())
 }
 

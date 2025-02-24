@@ -3,6 +3,7 @@
     {
       "listener_type": "ethereum",
       "id": "sepolia",
+      "chain_id": 0,      
       "relayers": ["rococo"],
       "config": {
         "node_rpc_url": "http://ethereum-node:8545",
@@ -11,9 +12,21 @@
       }
     },
     {
+      "listener_type": "ethereum",
+      "id": "ethereum-2",
+      "chain_id": 56,
+      "relayers": ["rococo"],
+      "config": {
+        "node_rpc_url": "http://ethereum-2-node:8545",
+        "bridge_contract_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "finalization_gap": 6
+      }
+    },
+    {
       "listener_type": "substrate",
       "id": "rococo",
-      "relayers": ["sepolia"],
+      "chain_id": 0,      
+      "relayers": ["sepolia", "ethereum-2"],
       "config": {
         "ws_rpc_endpoint": "ws://heima-node:9944",
         "chain": "local"
@@ -24,14 +37,25 @@
     {
       "relayer_type": "ethereum",
       "id": "sepolia",
+      "destination_id": "0100000000",
       "config": {
         "node_rpc_url": "http://ethereum-node:8545",
         "bridge_contract_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
       }
     },
     {
+      "relayer_type": "ethereum",
+      "id": "ethereum-2",
+      "destination_id": "0138000000",
+      "config": {
+        "node_rpc_url": "http://ethereum-2-node:8545",
+        "bridge_contract_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      }
+    },
+    {
       "relayer_type": "substrate",
       "id": "rococo",
+      "destination_id": "00",
       "config": {
         "ws_rpc_endpoint": "ws://heima-node:9944",
         "chain": "local"

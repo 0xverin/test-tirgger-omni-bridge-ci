@@ -12,3 +12,5 @@ artifacts/ethereum/HEI-token/out/
 *.manifest
 *.manifest.sgx
 *.sig
+
+!local/keystore/ethereum-2.bin

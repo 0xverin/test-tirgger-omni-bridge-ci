@@ -29,8 +29,5 @@ substrate-relayer = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 reqwest = { workspace = true }
-once_cell = { workspace = true }
 jsonrpsee-core = { workspace = true }
-hex-literal = { workspace = true }
