@@ -164,6 +164,7 @@ pub async fn create_from_config(
         let bridge_contract_wrapper = BridgeContractWrapper { instance: bridge_instance };
 
         let relayer: EthereumRelayer<BridgeContractWrapper> = EthereumRelayer::new(
+            relayer_config.id.clone(),
             relayer_address.to_string(),
             bridge_contract_wrapper,
             relayer_config.destination_id.clone(),
@@ -178,6 +179,7 @@ pub async fn create_from_config(
 /// Relays bridge request to smart contracts deployed on ethereum based network.
 #[allow(clippy::type_complexity)]
 pub struct EthereumRelayer<T: BridgeInterface + RelayerBalance> {
+    id: String,
     address: String,
     bridge_instance: T,
     destination_id: String,
@@ -186,14 +188,14 @@ pub struct EthereumRelayer<T: BridgeInterface + RelayerBalance> {
 // TODO: We need to configure gas options
 #[allow(clippy::result_unit_err)]
 impl<T: BridgeInterface + RelayerBalance> EthereumRelayer<T> {
-    pub async fn new(address: String, bridge_instance: T, destination_id: String) -> Result<Self, ()> {
-        describe_gauge!(balance_gauge_name(&address), "Ethereum relayer balance");
+    pub async fn new(id: String, address: String, bridge_instance: T, destination_id: String) -> Result<Self, ()> {
+        describe_gauge!(balance_gauge_name(&address, &id), "Ethereum relayer balance");
 
         // initalize relayer's balance metric
         if let Ok(balance) = bridge_instance.get_balance().await {
-            gauge!(balance_gauge_name(&address)).set(balance as f64);
+            gauge!(balance_gauge_name(&address, &id)).set(balance as f64);
         }
-        Ok(Self { address, bridge_instance, destination_id })
+        Ok(Self { id, address, bridge_instance, destination_id })
     }
 }
 
@@ -240,7 +242,7 @@ impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer<String> for Ethe
         // domainId 0 - heima
         self.bridge_instance.vote_proposal(0, nonce, resource_id, call_data).await?;
         if let Ok(balance) = self.bridge_instance.get_balance().await {
-            gauge!(balance_gauge_name(&self.address)).set(balance as f64);
+            gauge!(balance_gauge_name(&self.address, &self.id)).set(balance as f64);
         }
 
         debug!("Proposal relayed");
@@ -273,8 +275,8 @@ pub fn prepare_bridge_instance(
     )
 }
 
-fn balance_gauge_name(address: &str) -> String {
-    format!("{}_eth_balance", address)
+fn balance_gauge_name(address: &str, id: &str) -> String {
+    format!("{}_{}_eth_balance", address, id)
 }
 
 #[cfg(test)]
@@ -311,9 +313,10 @@ pub mod tests {
         let mut bridge_instance = MockBridgeInstance::new();
         bridge_instance.expect_vote_proposal().returning(|_, _, _, _| Ok(()));
 
-        let relayer = EthereumRelayer::new("0x".to_string(), bridge_instance, "0100000000".to_string())
-            .await
-            .unwrap();
+        let relayer =
+            EthereumRelayer::new("test".to_string(), "0x".to_string(), bridge_instance, "0100000000".to_string())
+                .await
+                .unwrap();
 
         let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec(), 0).await;
         assert!(matches!(result, Err(RelayError::Other)));
