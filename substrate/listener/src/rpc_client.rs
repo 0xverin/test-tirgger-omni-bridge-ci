@@ -64,16 +64,24 @@ impl<ChainConfig: Config, PalletPaidInEventType: PalletPaidInEvent> SubstrateRpc
     for RpcClient<ChainConfig, PalletPaidInEventType>
 {
     async fn get_last_finalized_block_num(&mut self) -> Result<u64, ()> {
-        let finalized_header = self.legacy.chain_get_finalized_head().await.map_err(|_| ())?;
-        match self.legacy.chain_get_header(Some(finalized_header)).await.map_err(|_| ())? {
+        let finalized_header = self.legacy.chain_get_finalized_head().await.map_err(|e| {
+            log::error!("Get finalized head error: {:?}", e);
+        })?;
+        match self.legacy.chain_get_header(Some(finalized_header)).await.map_err(|e| {
+            log::error!("Get header error: {:?}", e);
+        })? {
             Some(header) => Ok(header.number().into()),
             None => Err(()),
         }
     }
     async fn get_block_pay_in_events(&mut self, block_num: u64) -> Result<Vec<BlockEvent<PaidInEvent>>, ()> {
-        match self.legacy.chain_get_block_hash(Some(block_num.into())).await.map_err(|_| ())? {
+        match self.legacy.chain_get_block_hash(Some(block_num.into())).await.map_err(|e| {
+            log::error!("Get last block hash error: {:?}", e);
+        })? {
             Some(hash) => {
-                let events = self.events.at(BlockRef::from_hash(hash)).await.map_err(|_| ())?;
+                let events = self.events.at(BlockRef::from_hash(hash)).await.map_err(|e| {
+                    log::error!("Get events at {:?} error: {:?}", block_num, e);
+                })?;
 
                 let pay_in_events = events.find::<PalletPaidInEventType::MetadataType>();
 
