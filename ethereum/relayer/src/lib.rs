@@ -37,6 +37,7 @@ use mockall::automock;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub mod key_store;
 
@@ -104,6 +105,7 @@ impl BridgeInterface for BridgeContractWrapper {
                     RelayError::Other
                 }
             })?
+            .with_timeout(Some(Duration::from_secs(30)))
             .watch()
             .await
             .map_err(|e| {
