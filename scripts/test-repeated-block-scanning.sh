@@ -13,7 +13,7 @@ CLI=./target/debug/bridge-cli
 $CLI --version
 
 echo "Force recreating the omni-bridge container..." 
-docker compose up -d --force-recreate --no-deps omni-bridge 
+docker compose -f docker/chains.yml -f docker/deployers.yml -f docker/explorer.yml -f docker/omni-bridge.yml up -d --force-recreate --no-deps omni-bridge 
 echo "sleeping for 60s.."
 sleep 60
 

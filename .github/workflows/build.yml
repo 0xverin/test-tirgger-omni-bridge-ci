@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup the network
         run: |
-          docker compose up -d --remove-orphans
+          docker compose -f docker/chains.yml -f docker/deployers.yml -f docker/explorer.yml -f docker/omni-bridge.yml up -d --remove-orphans
           sleep 30
 
       - name: Run e2e test

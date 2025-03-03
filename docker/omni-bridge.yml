@@ -1,0 +1,12 @@
+services: 
+  omni-bridge:
+    image: bridge:latest
+    environment:
+      - RUST_LOG=debug
+    depends_on:
+      - ethereum-node
+      - heima-node
+    volumes:
+      - ./../artifacts/:/artifacts
+    ports:
+      - "9090:9090"

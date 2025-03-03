@@ -68,7 +68,7 @@ build-docker-dev:
 
 .PHONY: start-local
 start-local:
-	docker compose up --force-recreate --remove-orphans
+	docker compose -f docker/chains.yml -f docker/deployers.yml -f docker/explorer.yml -f docker/omni-bridge.yml up --force-recreate --remove-orphans
 
 .PHONY: start-local-e2e-test
 start-local-e2e-test:
@@ -80,7 +80,7 @@ test-repeated-block-scanning:
 
 .PHONY: stop-local
 stop-local:
-	docker compose down
+	docker compose -f docker/chains.yml -f docker/deployers.yml -f docker/explorer.yml -f docker/omni-bridge.yml down
 
 .PHONY: build-evm-contracts
 build-evm-contracts:

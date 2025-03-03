@@ -1,0 +1,20 @@
+services:
+  ethereum-node:
+    image: ghcr.io/foundry-rs/foundry
+    command:
+      - "anvil --host 0.0.0.0 --block-time 1"
+    ports:
+      - "8545:8545"
+
+  ethereum-2-node:
+    image: ghcr.io/foundry-rs/foundry
+    command:
+      - "anvil --host 0.0.0.0 --block-time 1"
+    ports:
+      - "8546:8545"
+
+  heima-node:
+    image: litentry/litentry-parachain:latest
+    ports:
+      - "9944:9944"
+    command: ["--dev", "--rpc-external"]
