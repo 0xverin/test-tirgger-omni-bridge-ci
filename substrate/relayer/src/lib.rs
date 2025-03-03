@@ -229,8 +229,8 @@ impl<ChainConfig: Config, PRCF: PayOutRequestCallFactory> Relayer<String> for Su
         &self,
         amount: u128,
         nonce: u64,
-        resource_id: [u8; 32],
-        _data: Vec<u8>,
+        resource_id: &[u8; 32],
+        _data: &[u8],
         chain_id: u32,
     ) -> Result<(), RelayError> {
         let account_bytes: [u8; 32] = _data[64..96].try_into().unwrap();
@@ -238,7 +238,7 @@ impl<ChainConfig: Config, PRCF: PayOutRequestCallFactory> Relayer<String> for Su
         debug!("Relaying amount: {} with nonce: {} to account: {:?}", amount, nonce, account);
         let call = self
             .payout_request_call_factory
-            .create(amount, nonce, resource_id, account, chain_id);
+            .create(amount, nonce, resource_id.to_owned(), account, chain_id);
         log::debug!("Submitting PayOutRequest extrinsic: {:?}", call);
 
         let api = OnlineClient::<PolkadotConfig>::from_insecure_url(&self.rpc_url)

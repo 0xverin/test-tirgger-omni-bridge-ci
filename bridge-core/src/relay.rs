@@ -37,8 +37,8 @@ pub trait Relayer<DestinationId: Send + Sync>: Send + Sync {
         &self,
         amount: u128,
         nonce: u64,
-        resource_id: [u8; 32],
-        data: Vec<u8>,
+        resource_id: &[u8; 32],
+        data: &[u8],
         chain_id: u32,
     ) -> Result<(), RelayError>;
     fn destination_id(&self) -> DestinationId;
@@ -46,5 +46,13 @@ pub trait Relayer<DestinationId: Send + Sync>: Send + Sync {
 
 pub enum RelayError {
     TransportError,
+    WatchError,
+    AlreadyRelayed,
     Other,
+}
+
+impl RelayError {
+    pub fn is_recoverable(&self) -> bool {
+        matches!(self, Self::TransportError)
+    }
 }

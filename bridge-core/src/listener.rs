@@ -233,47 +233,87 @@ impl<
                                     self.checkpoint_repository.get().expect("Could not read checkpoint")
                                 {
                                     if checkpoint.lt(&event.id.clone().into()) {
-                                        log::info!("Relaying");
+                                        let mut attempt = 1;
+                                        'relay: loop {
+                                            log::info!("Relaying attempt: {}", attempt);
 
-                                        match self.handle.block_on(relayer.relay(
-                                            event.amount,
-                                            event.nonce,
-                                            event.resource_id,
-                                            event.data,
-                                            self.chain_id,
-                                        )) {
-                                            Err(RelayError::TransportError) => {
-                                                log::info!("Could not relay due to TransportError, will try again...");
-                                                sleep(Duration::from_secs(1));
-                                                continue 'main;
-                                            },
-                                            Err(RelayError::Other) => {
-                                                log::error!("Unexpected error occurred during relaying");
+                                            if attempt > 10 {
+                                                log::error!("Exceeded maximum number of relaying attempts");
                                                 return Err(());
-                                            },
-                                            _ => {},
+                                            }
+
+                                            match self.handle.block_on(relayer.relay(
+                                                event.amount,
+                                                event.nonce,
+                                                &event.resource_id,
+                                                &event.data,
+                                                self.chain_id,
+                                            )) {
+                                                Err(RelayError::TransportError) => {
+                                                    log::info!(
+                                                        "Could not relay due to TransportError, will try again..."
+                                                    );
+                                                    sleep(Duration::from_secs(1));
+                                                    attempt += 1;
+                                                    continue 'relay;
+                                                },
+                                                Err(RelayError::Other) => {
+                                                    log::error!("Unexpected error occurred during relaying");
+                                                    return Err(());
+                                                },
+                                                Err(RelayError::WatchError) => {
+                                                    // retry the same event again
+                                                    attempt += 1;
+                                                    continue 'relay;
+                                                },
+                                                Err(RelayError::AlreadyRelayed) => {
+                                                    log::error!("Already relayed");
+                                                    break 'relay;
+                                                },
+                                                _ => break 'relay,
+                                            }
                                         }
                                     } else {
                                         log::debug!("Skipping event");
                                     }
                                 } else {
-                                    match self.handle.block_on(relayer.relay(
-                                        event.amount,
-                                        event.nonce,
-                                        event.resource_id,
-                                        event.data,
-                                        self.chain_id,
-                                    )) {
-                                        Err(RelayError::TransportError) => {
-                                            log::info!("Could not relay due to TransportError, will try again...");
-                                            sleep(Duration::from_secs(1));
-                                            continue 'main;
-                                        },
-                                        Err(RelayError::Other) => {
-                                            log::error!("Unexpected error occurred during relaying");
+                                    let mut attempt = 1;
+                                    'relay: loop {
+                                        log::info!("Relaying attempt: {}", attempt);
+
+                                        if attempt > 10 {
+                                            log::error!("Exceeded maximum number of relaying attempts");
                                             return Err(());
-                                        },
-                                        _ => {},
+                                        }
+
+                                        match self.handle.block_on(relayer.relay(
+                                            event.amount,
+                                            event.nonce,
+                                            &event.resource_id,
+                                            &event.data,
+                                            self.chain_id,
+                                        )) {
+                                            Err(RelayError::TransportError) => {
+                                                log::info!("Could not relay due to TransportError, will try again...");
+                                                sleep(Duration::from_secs(1));
+                                                attempt += 1;
+                                                continue 'relay;
+                                            },
+                                            Err(RelayError::Other) => {
+                                                log::error!("Unexpected error occurred during relaying");
+                                                return Err(());
+                                            },
+                                            Err(RelayError::WatchError) => {
+                                                // retry the same event again
+                                                attempt += 1;
+                                                continue 'relay;
+                                            },
+                                            Err(RelayError::AlreadyRelayed) => {
+                                                log::error!("Already relayed");
+                                                break 'relay;
+                                            },
+                                            _ => break 'relay,
+                                        }
                                     }
                                 }
                             }
@@ -317,7 +357,7 @@ pub mod tests {
     use crate::relay::{MockRelayer, Relay, RelayError};
     use crate::sync_checkpoint_repository::{Checkpoint, InMemoryCheckpointRepository};
     use async_trait::async_trait;
-    use mockall::predicate::eq;
+    use mockall::predicate::{always, eq};
     use mockall::*;
     use std::cmp::Ordering;
     use std::sync::Arc;
@@ -429,6 +469,59 @@ pub mod tests {
     }
 
     #[tokio::test]
+    pub async fn sync_should_keep_on_syncing_in_case_of_already_relayed_error() {
+        let handle = Handle::current();
+        let mut relayer = MockRelayer::new();
+        relayer
+            .expect_relay()
+            .times(2)
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::AlreadyRelayed))));
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(0))
+            .times(0)
+            .returning(|_| Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(1))
+            .times(0)
+            .returning(|_| Ok(vec![PayIn::new(1, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(2))
+            .times(1)
+            .returning(|_| Ok(vec![PayIn::new(2, None, 0, 0, [0; 32], vec![])]));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(3))
+            .times(1)
+            .returning(|_| Ok(vec![PayIn::new(3, None, 0, 0, [0; 32], vec![])]));
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(Some(SimpleCheckpoint { block_num: 1 }));
+
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            assert!(result.is_ok());
+        });
+
+        // give a listener some time to make a couple of tries
+        thread::sleep(std::time::Duration::from_secs(3));
+
+        // stop listener
+        tx.send(()).unwrap();
+
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
     pub async fn sync_should_stop_in_case_of_relaying_other_error() {
         let handle = Handle::current();
 
@@ -465,24 +558,32 @@ pub mod tests {
         handle.join().unwrap();
     }
 
+    // we should have another version of this test case where after few retries relayers sucessfully relays and listener process events from next block
     #[tokio::test]
     pub async fn sync_should_retry_relaying_in_case_of_relaying_transport_error() {
         let handle = Handle::current();
 
         let mut relayer = MockRelayer::new();
+
         relayer
             .expect_relay()
-            .times(3)
+            .with(always(), eq(0), always(), always(), always())
+            .times(1)
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Ok(()))));
+
+        relayer
+            .expect_relay()
+            .with(always(), eq(1), always(), always(), always())
+            .times(10)
             .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
+
         let relay = Relay::Single(Arc::new(Box::new(relayer)));
 
         let mut fetcher = MockFetcher::new();
-        fetcher.expect_get_last_finalized_block_num().times(3).returning(|| Ok(Some(3)));
-        fetcher
-            .expect_get_block_pay_in_events()
-            .with(eq(0))
-            .times(3)
-            .returning(|_| Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![])]));
+        fetcher.expect_get_last_finalized_block_num().times(1).returning(|| Ok(Some(3)));
+        fetcher.expect_get_block_pay_in_events().with(eq(0)).times(1).returning(|_| {
+            Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![]), PayIn::new(1, None, 0, 1, [0; 32], vec![])])
+        });
 
         let (tx, rx) = tokio::sync::oneshot::channel();
 
@@ -493,7 +594,8 @@ pub mod tests {
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
-            assert!(result.is_ok());
+            // it will error because of retry attempts exceed
+            assert!(result.is_err());
         });
 
         // give a listener some time to make a couple of tries
@@ -501,6 +603,48 @@ pub mod tests {
 
         // stop listener
         tx.send(()).unwrap();
+
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    pub async fn sync_should_retry_relaying_in_case_of_relaying_watch_error() {
+        let handle = Handle::current();
+
+        let mut relayer = MockRelayer::new();
+
+        relayer
+            .expect_relay()
+            .with(always(), eq(0), always(), always(), always())
+            .times(1)
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Ok(()))));
+
+        relayer
+            .expect_relay()
+            .with(always(), eq(1), always(), always(), always())
+            .times(10)
+            .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::WatchError))));
+
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(1).returning(|| Ok(Some(3)));
+        fetcher.expect_get_block_pay_in_events().with(eq(0)).times(1).returning(|_| {
+            Ok(vec![PayIn::new(0, None, 0, 0, [0; 32], vec![]), PayIn::new(1, None, 0, 1, [0; 32], vec![])])
+        });
+
+        let (_, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(None);
+
+        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            // it will error because of retry attempts exceed
+            assert!(result.is_err());
+        });
 
         handle.join().unwrap();
     }

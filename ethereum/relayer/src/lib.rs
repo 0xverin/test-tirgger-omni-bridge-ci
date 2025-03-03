@@ -21,7 +21,8 @@ use alloy::hex::decode;
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
-use alloy::providers::{Identity, PendingTransactionError, Provider, ProviderBuilder, RootProvider, WalletProvider};
+use alloy::providers::PendingTransactionError;
+use alloy::providers::{Identity, Provider, ProviderBuilder, RootProvider, WalletProvider};
 use alloy::signers::k256::ecdsa::SigningKey;
 use alloy::signers::local::{LocalSigner, PrivateKeySigner};
 use alloy::sol;
@@ -99,10 +100,25 @@ impl BridgeInterface for BridgeContractWrapper {
             .await
             .map_err(|e| {
                 error!("Could not send proposal vote: {:?}", e);
-                if matches!(e, alloy::contract::Error::TransportError(_)) {
-                    RelayError::TransportError
-                } else {
-                    RelayError::Other
+                match e {
+                    alloy::contract::Error::TransportError(e) => {
+                        if e.is_transport_error() {
+                            RelayError::TransportError
+                        } else if e.is_error_resp() {
+                            if let Some(resp) = e.as_error_resp() {
+                                if resp.code == 3 {
+                                    RelayError::AlreadyRelayed
+                                } else {
+                                    RelayError::Other
+                                }
+                            } else {
+                                RelayError::Other
+                            }
+                        } else {
+                            RelayError::Other
+                        }
+                    },
+                    _ => RelayError::Other,
                 }
             })?
             .with_timeout(Some(Duration::from_secs(30)))
@@ -110,10 +126,16 @@ impl BridgeInterface for BridgeContractWrapper {
             .await
             .map_err(|e| {
                 error!("Could not watch proposal vote: {:?}", e);
-                if matches!(e, PendingTransactionError::TransportError(_)) {
-                    RelayError::TransportError
-                } else {
-                    RelayError::Other
+                match e {
+                    PendingTransactionError::TransportError(e) => {
+                        if e.is_transport_error() {
+                            RelayError::TransportError
+                        } else {
+                            RelayError::Other
+                        }
+                    },
+                    PendingTransactionError::TxWatcher(_) => RelayError::WatchError,
+                    _ => RelayError::Other,
                 }
             })?;
         log::debug!("Submitted vote proposal, tx_hash: {:?}", tx_hash);
@@ -207,14 +229,14 @@ impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer<String> for Ethe
         &self,
         amount: u128,
         nonce: u64,
-        resource_id: [u8; 32],
-        data: Vec<u8>,
+        resource_id: &[u8; 32],
+        data: &[u8],
         _chain_id: u32,
     ) -> Result<(), RelayError> {
-        debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(&data));
+        debug!("Relaying amount: {} with nonce: {} to: {:?}", amount, nonce, Address::from_slice(data));
 
         // resource id 0
-        let resource_id = FixedBytes::new(resource_id);
+        let resource_id = FixedBytes::new(resource_id.to_owned());
 
         let amount = DynSolValue::Uint(U256::from(amount), 32).abi_encode();
         let address_len = DynSolValue::Uint(U256::from(data.len()), 32).abi_encode();
@@ -225,7 +247,7 @@ impl<T: BridgeInterface + RelayerBalance + Send + Sync> Relayer<String> for Ethe
         }
 
         let mut address_bytes = [0; 32];
-        address_bytes[0..20].copy_from_slice(&data);
+        address_bytes[0..20].copy_from_slice(data);
 
         let address = DynSolValue::FixedBytes(FixedBytes(address_bytes), 32).abi_encode();
 
@@ -320,7 +342,7 @@ pub mod tests {
                 .await
                 .unwrap();
 
-        let result = relayer.relay(100, 1, [0; 32], [0; 32].to_vec(), 0).await;
+        let result = relayer.relay(100, 1, &[0; 32], &[0; 32], 0).await;
         assert!(matches!(result, Err(RelayError::Other)));
     }
 

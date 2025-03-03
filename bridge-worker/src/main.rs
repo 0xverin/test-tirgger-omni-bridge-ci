@@ -216,7 +216,9 @@ async fn sync_substrate(context: ListenerContext<SubstrateListenerConfig>) -> Re
             .await?;
             Ok(thread::Builder::new()
                 .name(format!("{}_sync", &context.id).to_string())
-                .spawn(move || listener.sync().unwrap())
+                .spawn(move || {
+                    let _ = listener.sync();
+                })
                 .unwrap())
         },
         "paseo" => {
@@ -232,7 +234,9 @@ async fn sync_substrate(context: ListenerContext<SubstrateListenerConfig>) -> Re
             .await?;
             Ok(thread::Builder::new()
                 .name(format!("{}_sync", &context.id).to_string())
-                .spawn(move || listener.sync().unwrap())
+                .spawn(move || {
+                    let _ = listener.sync();
+                })
                 .unwrap())
         },
         "heima" => {
@@ -248,7 +252,9 @@ async fn sync_substrate(context: ListenerContext<SubstrateListenerConfig>) -> Re
             .await?;
             Ok(thread::Builder::new()
                 .name(format!("{}_sync", &context.id).to_string())
-                .spawn(move || listener.sync().unwrap())
+                .spawn(move || {
+                    let _ = listener.sync();
+                })
                 .unwrap())
         },
         _ => panic!("Unknown chain: {}", context.config.chain),
