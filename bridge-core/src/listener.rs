@@ -30,6 +30,8 @@ use crate::{
     sync_checkpoint_repository::{Checkpoint, CheckpointRepository},
 };
 
+pub const RELAY_MAX_ATTEMPTS: u8 = 10;
+
 /// Represents `PayIn` event emitted on one side of the bridge.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PayIn<Id: Clone, DestinationId: Clone> {
@@ -123,6 +125,7 @@ pub struct Listener<DestinationId, Fetcher, Checkpoint, CheckpointRepository, Pa
     checkpoint_repository: CheckpointRepository,
     start_block: u64,
     chain_id: u32,
+    max_relay_retry_attempts: u8,
     _phantom: PhantomData<(Checkpoint, PayInEventId)>,
 }
 
@@ -144,6 +147,7 @@ impl<
         last_processed_log_repository: CheckpointRepositoryT,
         start_block: u64,
         chain_id: u32,
+        max_relay_retry_attempts: u8,
     ) -> Result<Self, ()> {
         describe_gauge!(synced_block_gauge_name(id), "Last synced block");
         Ok(Self {
@@ -155,6 +159,7 @@ impl<
             checkpoint_repository: last_processed_log_repository,
             start_block,
             chain_id,
+            max_relay_retry_attempts,
             _phantom: PhantomData,
         })
     }
@@ -237,7 +242,7 @@ impl<
                                         'relay: loop {
                                             log::info!("Relaying attempt: {}", attempt);
 
-                                            if attempt > 10 {
+                                            if attempt > self.max_relay_retry_attempts {
                                                 log::error!("Exceeded maximum number of relaying attempts");
                                                 return Err(());
                                             }
@@ -281,7 +286,7 @@ impl<
                                     'relay: loop {
                                         log::info!("Relaying attempt: {}", attempt);
 
-                                        if attempt > 10 {
+                                        if attempt > self.max_relay_retry_attempts {
                                             log::error!("Exceeded maximum number of relaying attempts");
                                             return Err(());
                                         }
@@ -353,7 +358,7 @@ fn synced_block_gauge_name(listener_id: &str) -> String {
 #[cfg(test)]
 pub mod tests {
     use crate::fetcher::{BlockPayInEventsFetcher, LastFinalizedBlockNumFetcher};
-    use crate::listener::{Listener, PayIn};
+    use crate::listener::{Listener, PayIn, RELAY_MAX_ATTEMPTS};
     use crate::relay::{MockRelayer, Relay, RelayError};
     use crate::sync_checkpoint_repository::{Checkpoint, InMemoryCheckpointRepository};
     use async_trait::async_trait;
@@ -452,7 +457,8 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(Some(SimpleCheckpoint { block_num: 1 }));
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -505,7 +511,8 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(Some(SimpleCheckpoint { block_num: 1 }));
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -545,7 +552,8 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(None);
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -574,7 +582,7 @@ pub mod tests {
         relayer
             .expect_relay()
             .with(always(), eq(1), always(), always(), always())
-            .times(10)
+            .times(RELAY_MAX_ATTEMPTS)
             .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
 
         let relay = Relay::Single(Arc::new(Box::new(relayer)));
@@ -590,7 +598,8 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(None);
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();
@@ -622,7 +631,7 @@ pub mod tests {
         relayer
             .expect_relay()
             .with(always(), eq(1), always(), always(), always())
-            .times(10)
+            .times(RELAY_MAX_ATTEMPTS)
             .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::WatchError))));
 
         let relay = Relay::Single(Arc::new(Box::new(relayer)));
@@ -638,7 +647,8 @@ pub mod tests {
         let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
             InMemoryCheckpointRepository::new(None);
 
-        let mut listener = Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0).unwrap();
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
 
         let handle = thread::spawn(move || {
             let result = listener.sync();

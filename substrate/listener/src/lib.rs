@@ -23,6 +23,7 @@ use crate::fetcher::Fetcher;
 use crate::listener::{ListenerConfig, SubstrateListener};
 use crate::rpc_client::{RpcClient, RpcClientFactory};
 use bridge_core::listener::Listener;
+use bridge_core::listener::RELAY_MAX_ATTEMPTS;
 use bridge_core::relay::{Relay, Relayer};
 use bridge_core::sync_checkpoint_repository::FileCheckpointRepository;
 use parity_scale_codec::Encode;
@@ -106,6 +107,7 @@ pub async fn create_local_listener<ChainConfig: Config>(
         last_processed_log_repository,
         start_block,
         chain_id,
+        RELAY_MAX_ATTEMPTS,
     )
 }
 
@@ -140,6 +142,7 @@ pub async fn create_paseo_listener<ChainConfig: Config>(
         last_processed_log_repository,
         start_block,
         chain_id,
+        RELAY_MAX_ATTEMPTS,
     )
 }
 
@@ -174,6 +177,7 @@ pub async fn create_heima_listener<ChainConfig: Config>(
         last_processed_log_repository,
         start_block,
         chain_id,
+        RELAY_MAX_ATTEMPTS,
     )
 }
 

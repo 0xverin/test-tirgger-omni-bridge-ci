@@ -17,6 +17,7 @@
 use crate::fetcher::Fetcher;
 use crate::listener::ListenerConfig;
 use alloy::primitives::Address;
+use bridge_core::listener::RELAY_MAX_ATTEMPTS;
 use bridge_core::relay;
 use bridge_core::sync_checkpoint_repository::FileCheckpointRepository;
 use bridge_core::{listener::Listener, relay::Relayer};
@@ -67,6 +68,7 @@ pub fn create_listener(
         last_processed_log_repository,
         start_block,
         chain_id,
+        RELAY_MAX_ATTEMPTS,
     )
     .map_err(|e| error!("Error creating {} listener: {:?}", id, e))?;
 
