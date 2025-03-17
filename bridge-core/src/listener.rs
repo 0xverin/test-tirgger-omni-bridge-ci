@@ -582,7 +582,7 @@ pub mod tests {
         relayer
             .expect_relay()
             .with(always(), eq(1), always(), always(), always())
-            .times(RELAY_MAX_ATTEMPTS)
+            .times(RELAY_MAX_ATTEMPTS as usize)
             .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::TransportError))));
 
         let relay = Relay::Single(Arc::new(Box::new(relayer)));
@@ -631,7 +631,7 @@ pub mod tests {
         relayer
             .expect_relay()
             .with(always(), eq(1), always(), always(), always())
-            .times(RELAY_MAX_ATTEMPTS)
+            .times(RELAY_MAX_ATTEMPTS as usize)
             .returning(|_, _, _, _, _| Box::pin(futures::future::ready(Err(RelayError::WatchError))));
 
         let relay = Relay::Single(Arc::new(Box::new(relayer)));

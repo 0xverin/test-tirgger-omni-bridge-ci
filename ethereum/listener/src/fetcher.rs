@@ -152,7 +152,7 @@ mod test {
         let block_2_logs: Vec<Log> = vec![];
 
         let block_1_pay_in_events: Vec<EthereumPayInEvent> =
-            vec![PayIn::new(PayInEventId::new(1, 1, 1), None, 10, 1, [0; 32], event_data)];
+            vec![PayIn::new(PayInEventId::new(1, 1, 1), Some("00".to_string()), 10, 1, [0; 32], event_data)];
         let block_2_pay_in_events: Vec<EthereumPayInEvent> = vec![];
 
         pay_in_events.insert(1, block_1_pay_in_events.clone());

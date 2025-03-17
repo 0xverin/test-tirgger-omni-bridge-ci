@@ -335,7 +335,7 @@ pub mod tests {
     #[tokio::test]
     pub async fn should_return_error_if_wrong_address_len() {
         let mut bridge_instance = MockBridgeInstance::new();
-        bridge_instance.expect_vote_proposal().returning(|_, _, _, _| Ok(()));
+        bridge_instance.expect_get_balance().returning(|| Ok(1));
 
         let relayer =
             EthereumRelayer::new("test".to_string(), "0x".to_string(), bridge_instance, "0100000000".to_string())

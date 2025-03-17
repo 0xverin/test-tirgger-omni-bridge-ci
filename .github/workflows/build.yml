@@ -47,6 +47,12 @@ jobs:
       - name: Install toolchain
         run: rustup show
 
+      - name: Test
+        run: |
+          cd ethereum/chainbridge-contracts/ && forge build
+          cd ../.. && cargo test  
+          cargo clean
+
       - name: Build
         run: |
           make build-evm-contracts # we refer to Bridge.json in the code
