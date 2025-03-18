@@ -187,7 +187,7 @@ impl<
             };
         log::debug!("Starting sync from {:?}", block_number_to_sync);
 
-        'main: loop {
+        loop {
             log::debug!("Starting syncing block: {}", block_number_to_sync);
             if self.stop_signal.try_recv().is_ok() {
                 return Ok(());
@@ -337,7 +337,6 @@ impl<
                     Err(e) => {
                         log::error!("Could not get events: {:?}", e);
                         sleep(Duration::from_secs(1));
-                        continue 'main;
                     },
                 }
             }
@@ -655,6 +654,43 @@ pub mod tests {
             // it will error because of retry attempts exceed
             assert!(result.is_err());
         });
+
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    pub async fn sync_should_retry_in_case_of_events_fetch_error() {
+        let handle = Handle::current();
+        let relayer = MockRelayer::new();
+        let relay = Relay::Single(Arc::new(Box::new(relayer)));
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.expect_get_last_finalized_block_num().times(2).returning(|| Ok(Some(3)));
+        fetcher
+            .expect_get_block_pay_in_events()
+            .with(eq(0))
+            .times(2)
+            .returning(|_| Err(()));
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        let checkpoint_repository: InMemoryCheckpointRepository<SimpleCheckpoint> =
+            InMemoryCheckpointRepository::new(None);
+
+        let mut listener =
+            Listener::new("test", handle, fetcher, relay, rx, checkpoint_repository, 0, 0, RELAY_MAX_ATTEMPTS).unwrap();
+
+        let handle = thread::spawn(move || {
+            let result = listener.sync();
+            // it will error because of retry attempts exceed
+            assert!(result.is_ok());
+        });
+
+        // give a listener some time to make a couple of tries
+        thread::sleep(std::time::Duration::from_secs(2));
+
+        // stop listener
+        tx.send(()).unwrap();
 
         handle.join().unwrap();
     }
