@@ -3,7 +3,7 @@
     {
       "listener_type": "ethereum",
       "id": "sepolia",
-      "chain_id": 0,      
+      "chain_id": 0,
       "relayers": ["rococo"],
       "config": {
         "node_rpc_url": "http://ethereum-node:8545",
@@ -55,7 +55,7 @@
     {
       "relayer_type": "substrate",
       "id": "rococo",
-      "destination_id": "00",
+      "destination_id": "02",
       "config": {
         "ws_rpc_endpoint": "ws://heima-node:9944",
         "chain": "local"

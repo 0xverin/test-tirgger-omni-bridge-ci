@@ -327,7 +327,7 @@ async fn bridge_deposit(by_private_key: &str, amount: &str, account: String, bri
     bytes.extend(address);
 
     let call_data = Bytes::copy_from_slice(&bytes);
-    let builder = bridge_instance.deposit(0, resource_id, call_data);
+    let builder = bridge_instance.deposit(2, resource_id, call_data);
     builder.send().await.unwrap().watch().await.unwrap();
 }
 
