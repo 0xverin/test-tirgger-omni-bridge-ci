@@ -64,3 +64,4 @@ substrate-listener = { path = "substrate/listener" }
 substrate-relayer = { path = "substrate/relayer" }
 metrics = "0.24.1"
 metrics-exporter-prometheus = "0.16.2"
+itertools = "0.14.0"

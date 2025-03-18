@@ -108,6 +108,10 @@ async fn run(arg: &RunArgs) -> Result<(), ()> {
     let config: String = fs::read_to_string(config_file).unwrap();
     let config: BridgeConfig = serde_json::from_str(&config).unwrap();
 
+    config.validate().map_err(|e| {
+        error!("Config validation error: {:?}", e);
+    })?;
+
     #[allow(clippy::type_complexity)]
     let mut relayers: HashMap<String, HashMap<String, Arc<Box<dyn Relayer<String>>>>> = HashMap::new();
 

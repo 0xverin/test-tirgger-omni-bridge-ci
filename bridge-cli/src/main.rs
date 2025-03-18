@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
-use clap::{Parser, Subcommand};
+use bridge_core::config::BridgeConfig;
+use clap::{Args, Parser, Subcommand};
 use ethereum_cli::EthereumCommand;
+use std::fs;
 use substrate_cli::SubstrateCommand;
 // !!!Only for dev purposes!!!
 
@@ -26,12 +28,18 @@ struct Cli {
     command: Option<Command>,
 }
 
+#[derive(Args)]
+pub struct CheckConfigArgs {
+    path: String,
+}
+
 #[derive(Subcommand)]
 pub enum Command {
     #[command(subcommand)]
     Ethereum(EthereumCommand),
     #[command(subcommand)]
     Substrate(SubstrateCommand),
+    CheckConfig(CheckConfigArgs),
 }
 
 #[tokio::main]
@@ -45,6 +53,12 @@ async fn main() -> Result<(), ()> {
         },
         Some(Command::Substrate(substrate_command)) => {
             substrate_cli::handle(substrate_command).await;
+        },
+        Some(Command::CheckConfig(args)) => {
+            let config: String = fs::read_to_string(&args.path).unwrap();
+            let config: BridgeConfig = serde_json::from_str(&config).unwrap();
+            config.validate().unwrap();
+            println!("Config ok.");
         },
         _ => println!("No command specified!"),
     }

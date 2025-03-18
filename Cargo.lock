@@ -1286,9 +1286,11 @@ dependencies = [
 name = "bridge-cli"
 version = "0.1.4"
 dependencies = [
+ "bridge-core",
  "clap",
  "env_logger",
  "ethereum-cli",
+ "serde_json",
  "substrate-cli",
  "tokio",
 ]
@@ -1301,6 +1303,7 @@ dependencies = [
  "ethereum-listener",
  "ethereum-relayer",
  "futures",
+ "itertools 0.14.0",
  "log",
  "metrics",
  "mockall",
@@ -1309,6 +1312,7 @@ dependencies = [
  "serde_json",
  "substrate-listener",
  "substrate-relayer",
+ "thiserror 2.0.12",
  "tokio",
 ]
 
@@ -1337,7 +1341,7 @@ dependencies = [
  "sp-core",
  "substrate-listener",
  "substrate-relayer",
- "thiserror 2.0.9",
+ "thiserror 2.0.12",
  "tokio",
 ]
 
@@ -2975,6 +2979,15 @@ name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -5967,11 +5980,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.9"
+version = "2.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f072643fd0190df67a8bab670c20ef5d8737177d6ac6b2e9a236cb096206b2cc"
+checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
 dependencies = [
- "thiserror-impl 2.0.9",
+ "thiserror-impl 2.0.12",
 ]
 
 [[package]]
@@ -5987,9 +6000,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.9"
+version = "2.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b50fa271071aae2e6ee85f842e2e28ba8cd2c5fb67f11fcb1fd70b276f9e7d4"
+checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",
