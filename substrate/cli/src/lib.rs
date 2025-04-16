@@ -68,9 +68,9 @@ pub async fn handle(command: &SubstrateCommand) {
         SubstrateCommand::SetupBridge(conf) => {
             if conf.relayer_account.as_str() != "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY" {
                 let add_relayer_call =
-                    crate::litentry_rococo::runtime_types::paseo_parachain_runtime::RuntimeCall::OmniBridge(
-                        Call::add_relayer { who: AccountId32::from_str(&conf.relayer_account).unwrap() },
-                    );
+                    crate::litentry_rococo::runtime_types::paseo_runtime::RuntimeCall::OmniBridge(Call::add_relayer {
+                        who: AccountId32::from_str(&conf.relayer_account).unwrap(),
+                    });
 
                 let add_relayer_sudo_call = litentry_rococo::tx().sudo().sudo(add_relayer_call);
 
@@ -85,7 +85,7 @@ pub async fn handle(command: &SubstrateCommand) {
             }
 
             let chain_asset = litentry_rococo::runtime_types::pallet_omni_bridge::ChainAsset {
-                chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Heima,
+                chain: crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Heima,
                 asset: litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native
             };
 
@@ -107,7 +107,8 @@ pub async fn handle(command: &SubstrateCommand) {
             hash.wait_for_finalized().await.unwrap();
 
             let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
-            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0);
+            let dest_chain =
+                crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(0);
 
             info!("Adding pay in pair on OmniBridgePallet");
             let add_pay_in_pair_call = litentry_rococo::tx().omni_bridge().add_pay_in_pair(asset_kind, dest_chain);
@@ -121,7 +122,8 @@ pub async fn handle(command: &SubstrateCommand) {
             hash.wait_for_finalized().await.unwrap();
 
             let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
-            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(56);
+            let dest_chain =
+                crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(56);
 
             info!("Adding pay in pair on OmniBridgePallet");
             let add_pay_in_pair_call = litentry_rococo::tx().omni_bridge().add_pay_in_pair(asset_kind, dest_chain);
@@ -135,7 +137,8 @@ pub async fn handle(command: &SubstrateCommand) {
             hash.wait_for_finalized().await.unwrap();
 
             let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
-            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(0);
+            let dest_chain =
+                crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(0);
 
             // set pay in fee
             info!("Setting pay in fee on OmniBridgePallet");
@@ -149,7 +152,8 @@ pub async fn handle(command: &SubstrateCommand) {
             hash.wait_for_finalized().await.unwrap();
 
             let asset_kind = litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native;
-            let dest_chain = litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(56);
+            let dest_chain =
+                crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(56);
 
             // set pay in fee
             info!("Setting pay in fee on OmniBridgePallet");
@@ -189,7 +193,7 @@ pub async fn handle(command: &SubstrateCommand) {
 
             let request = litentry_rococo::runtime_types::pallet_omni_bridge::PayInRequest {
                 asset: litentry_rococo::runtime_types::frame_support::traits::tokens::fungible::union_of::NativeOrWithId::Native,
-                dest_chain: litentry_rococo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(conf.ethereum_id),
+                dest_chain: crate::litentry_rococo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(conf.ethereum_id),
                 dest_account: recipient_address,
                 amount: conf.amount,
             };

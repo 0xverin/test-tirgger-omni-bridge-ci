@@ -14,7 +14,7 @@ services:
       - "8546:8545"
 
   heima-node:
-    image: litentry/litentry-parachain:latest
+    image: litentry/heima:latest
     ports:
       - "9944:9944"
     command: ["--dev", "--rpc-external"]

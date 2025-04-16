@@ -147,7 +147,7 @@ impl PayOutRequestCallFactory for LocalPayOutRequestCallFactory {
         chain_id: u32,
     ) -> Self::PayOutRequestCallType {
         let request = local::runtime_types::pallet_omni_bridge::PayOutRequest {
-            source_chain: local::runtime_types::pallet_omni_bridge::ChainType::Ethereum(chain_id),
+            source_chain: crate::local::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(chain_id),
             nonce,
             resource_id,
             dest_account: account,
@@ -171,7 +171,7 @@ impl PayOutRequestCallFactory for PaseoPayOutRequestCallFactory {
         chain_id: u32,
     ) -> Self::PayOutRequestCallType {
         let request = paseo::runtime_types::pallet_omni_bridge::PayOutRequest {
-            source_chain: paseo::runtime_types::pallet_omni_bridge::ChainType::Ethereum(chain_id),
+            source_chain: crate::paseo::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(chain_id),
             nonce,
             resource_id,
             dest_account: account,
@@ -195,7 +195,7 @@ impl PayOutRequestCallFactory for HeimaPayOutRequestCallFactory {
         chain_id: u32,
     ) -> Self::PayOutRequestCallType {
         let request = heima::runtime_types::pallet_omni_bridge::PayOutRequest {
-            source_chain: heima::runtime_types::pallet_omni_bridge::ChainType::Ethereum(chain_id),
+            source_chain: crate::heima::runtime_types::core_primitives::omni::chain::ChainType::Ethereum(chain_id),
             nonce,
             resource_id,
             dest_account: account,
