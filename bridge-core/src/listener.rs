@@ -342,7 +342,7 @@ impl<
             }
 
             if !fast {
-                sleep(Duration::from_secs(1))
+                sleep(Duration::from_secs(2))
             } else {
                 log::trace!("Fast sync skipping 1s wait");
             }
@@ -465,7 +465,7 @@ pub mod tests {
         });
 
         // give a listener some time to make a couple of tries
-        thread::sleep(std::time::Duration::from_secs(3));
+        thread::sleep(std::time::Duration::from_secs(5));
 
         // stop listener
         tx.send(()).unwrap();
@@ -519,7 +519,7 @@ pub mod tests {
         });
 
         // give a listener some time to make a couple of tries
-        thread::sleep(std::time::Duration::from_secs(3));
+        thread::sleep(std::time::Duration::from_secs(5));
 
         // stop listener
         tx.send(()).unwrap();
