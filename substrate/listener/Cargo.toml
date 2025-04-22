@@ -6,13 +6,13 @@ edition = "2021"
 [dependencies]
 async-trait = { workspace = true }
 bridge-core = { workspace = true }
+hex = { workspace = true }
 log = { workspace = true }
 parity-scale-codec = { workspace = true }
 scale-encode = { workspace = true }
 serde = { workspace = true }
-subxt = { workspace = true }
+subxt = { workspace = true, features = ["reconnecting-rpc-client"] }
 tokio = { workspace = true }
-hex = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

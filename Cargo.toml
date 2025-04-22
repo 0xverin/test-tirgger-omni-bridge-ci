@@ -39,9 +39,9 @@ serde_with = { version = "3.11", features = ["hex"] }
 hex = "0.4"
 rand = "0.8.5"
 rsa = { version = "0.9.6", features = ["serde"] }
-subxt = "0.37"
-subxt-core = "0.37"
-subxt-signer = { version = "0.37.0", features = ["subxt"] }
+subxt = "0.40"
+subxt-core = "0.40"
+subxt-signer = { version = "0.40.0", features = ["subxt"] }
 sp-core = "34.0.0"
 hex-literal = "0.4"
 tempfile = "3.14.0"

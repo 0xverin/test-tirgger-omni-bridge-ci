@@ -15,4 +15,4 @@ tokio = { workspace = true, features = ["sync"] }
 [dev-dependencies]
 serde_json = { workspace = true }
 tempfile = { workspace = true }
-scale-encode = { workspace = true}
+scale-encode = { workspace = true }

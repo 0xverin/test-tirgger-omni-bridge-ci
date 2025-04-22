@@ -8,8 +8,8 @@ alloy = { workspace = true, features = ["contract", "signer-local"] }
 async-trait = { workspace = true }
 bridge-core = { workspace = true }
 log = { workspace = true }
-serde = { workspace = true }
 metrics = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

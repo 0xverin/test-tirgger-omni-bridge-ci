@@ -6,12 +6,12 @@ edition = "2021"
 [dependencies]
 alloy = { workspace = true, features = ["rpc", "rpc-types", "dyn-abi", "contract"] }
 async-trait = { workspace = true }
+bridge-core = { workspace = true }
+hex = { workspace = true }
 log = { workspace = true }
 parity-scale-codec = { workspace = true }
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { workspace = true }
-bridge-core = { workspace = true }
-hex = { workspace = true }
 
 [dev-dependencies]
 futures = { workspace = true }
