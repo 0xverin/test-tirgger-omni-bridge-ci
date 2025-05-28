@@ -47,9 +47,13 @@ jobs:
       - name: Print trigger information
         run: |
           echo "Workflow triggered by: ${{ github.event_name }}"
+          echo "Trigger time: $(date)"
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "Event type: ${{ github.event.action }}"
             echo "Triggered by Heima update"
+            echo "Sender: ${{ github.event.sender.login }}"
+            echo "Client payload:"
+            echo '${{ toJSON(github.event.client_payload) }}'
           fi
 
       - name: Install foundry
