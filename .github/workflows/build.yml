@@ -15,6 +15,9 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  repository_dispatch:
+    types:
+      - heima-update
   workflow_dispatch:
 
 env:
@@ -40,6 +43,14 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Print trigger information
+        run: |
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "Event type: ${{ github.event.action }}"
+            echo "Triggered by Heima update"
+          fi
 
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
